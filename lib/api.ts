@@ -1,5 +1,33 @@
 
-const BASE_URL = '/api'; // In production, this would be your API root
+// 支持环境变量配置后端地址，开发环境使用代理，生产环境使用完整 URL
+// 统一确保最终 BASE_URL 以 /api 结尾，便于拼接 /admin/... 路由
+function getBaseUrl(): string {
+  const envUrl = (import.meta.env?.VITE_API_BASE as string | undefined)?.trim();
+
+  // 如果没有配置环境变量，使用相对路径（开发环境由 Vite 代理到本地后端）
+  if (!envUrl) {
+    return '/api';
+  }
+
+  let url = envUrl;
+
+  // 如果缺少协议，生产默认补 https，开发默认补 http
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = import.meta.env.PROD ? `https://${url}` : `http://${url}`;
+  }
+
+  // 移除末尾斜杠
+  url = url.replace(/\/+$/, '');
+
+  // 确保以 /api 结尾（后端路由为 /api/admin/...）
+  if (!url.toLowerCase().endsWith('/api')) {
+    url = `${url}/api`;
+  }
+
+  return url;
+}
+
+const BASE_URL = getBaseUrl();
 
 export const getAdminKey = () => localStorage.getItem('RABBIT_ADMIN_KEY');
 export const setAdminKey = (key: string) => localStorage.setItem('RABBIT_ADMIN_KEY', key);
@@ -14,17 +42,38 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
   }
   headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
+  const url = `${BASE_URL}${endpoint}`;
+  
+  // 开发环境打印调试信息
+  if (import.meta.env.DEV) {
+    console.log('[API] Request:', url, { headers: Object.fromEntries(headers) });
+  }
+
+  const response = await fetch(url, {
     ...options,
     headers,
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `API error: ${response.status}`);
+    const errorMsg = errorData.message || `API error: ${response.status}`;
+    console.error('[API] Error:', url, response.status, errorMsg);
+    
+    // 如果是 401 未授权错误，清除无效的 admin key 并触发登出
+    if (response.status === 401 && (errorMsg.includes('UNAUTHORIZED') || errorMsg.includes('Invalid admin'))) {
+      setAdminKey('');
+      // 触发自定义事件，通知 App 组件需要重新登录
+      window.dispatchEvent(new CustomEvent('admin-auth-failed'));
+    }
+    
+    throw new Error(errorMsg);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (import.meta.env.DEV) {
+    console.log('[API] Response:', url, data);
+  }
+  return data;
 }
 
 // ==================== 管理后台 API 函数 ====================

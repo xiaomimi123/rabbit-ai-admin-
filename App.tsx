@@ -10,17 +10,48 @@ import WithdrawalExpenses from './pages/WithdrawalExpenses';
 import YieldStrategy from './pages/YieldStrategy';
 import UsersPage from './pages/Users';
 import SystemConfigPage from './pages/SystemConfig';
-import { setAdminKey, getAdminKey } from './lib/api';
-import { Rabbit, Key } from 'lucide-react';
+import { setAdminKey, getAdminKey, getAdminKPIs } from './lib/api';
+import { Rabbit, Key, AlertCircle } from 'lucide-react';
 
 const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [inputKey, setInputKey] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputKey.trim()) {
-      setAdminKey(inputKey);
+    const key = inputKey.trim();
+    
+    if (!key) {
+      setError('请输入管理员密钥');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError(null);
+
+    try {
+      // 临时设置 key 用于验证
+      setAdminKey(key);
+      
+      // 调用 API 验证 key 是否有效
+      await getAdminKPIs();
+      
+      // 验证成功，保存 key 并进入系统
       onLogin();
+    } catch (err: any) {
+      // 验证失败，清除错误的 key
+      setAdminKey('');
+      const errorMsg = err?.message || '验证失败';
+      if (errorMsg.includes('401') || errorMsg.includes('UNAUTHORIZED') || errorMsg.includes('Invalid admin')) {
+        setError('管理员密钥无效，请检查后重试');
+      } else if (errorMsg.includes('404')) {
+        setError('无法连接到后端服务，请检查网络连接');
+      } else {
+        setError(`验证失败: ${errorMsg}`);
+      }
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -45,17 +76,30 @@ const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             <input 
               type="password"
               placeholder="管理员密钥 (Admin Key)"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono tracking-widest"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
               value={inputKey}
-              onChange={(e) => setInputKey(e.target.value)}
+              onChange={(e) => {
+                setInputKey(e.target.value);
+                setError(null); // 清除错误信息
+              }}
+              disabled={isVerifying}
               autoFocus
             />
           </div>
+          
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          
           <button 
             type="submit"
-            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-sm rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-[0.98]"
+            disabled={isVerifying}
+            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-[0.98]"
           >
-            授权进入系统
+            {isVerifying ? '验证中...' : '授权进入系统'}
           </button>
         </form>
 
@@ -69,6 +113,16 @@ const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!getAdminKey());
+
+  // 监听认证失败事件，自动登出
+  React.useEffect(() => {
+    const handleAuthFailed = () => {
+      setIsAuthenticated(false);
+    };
+    
+    window.addEventListener('admin-auth-failed', handleAuthFailed);
+    return () => window.removeEventListener('admin-auth-failed', handleAuthFailed);
+  }, []);
 
   if (!isAuthenticated) {
     return <LoginPage onLogin={() => setIsAuthenticated(true)} />;
