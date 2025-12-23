@@ -1,0 +1,220 @@
+
+import React, { useState, useEffect } from 'react';
+import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck } from 'lucide-react';
+import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo } from '../lib/api';
+import { Withdrawal } from '../types';
+
+const FinanceOps: React.FC = () => {
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [usdtBalance, setUsdtBalance] = useState<string>('0');
+  
+  const [isApproveOpen, setIsApproveOpen] = useState(false);
+  const [activeWithdrawal, setActiveWithdrawal] = useState<Withdrawal | null>(null);
+  const [txHash, setTxHash] = useState('');
+
+  useEffect(() => {
+    fetchPending();
+    fetchUsdtBalance();
+  }, []);
+
+  const fetchPending = async () => {
+    setLoading(true);
+    try {
+      const data = await getPendingWithdrawals(100);
+      setWithdrawals(data.items.map((item) => ({
+        id: item.id,
+        address: item.address,
+        amount: parseFloat(item.amount),
+        status: item.status as 'Pending' | 'Completed' | 'Rejected',
+        createdAt: new Date(item.createdAt).toLocaleString(),
+      })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsdtBalance = async () => {
+    try {
+      // 这里可以调用getUsdtInfo获取USDT合约信息，但余额需要从链上读取
+      // 暂时使用固定值，后续可以添加获取余额的API
+      setUsdtBalance('2400');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    if (!confirm('您确定要拒绝这笔提现申请吗？此操作无法撤销。')) return;
+    setProcessingId(id);
+    try {
+      await rejectWithdrawal(id);
+      setWithdrawals(prev => prev.filter(w => w.id !== id));
+      alert('提现已成功拒绝。');
+    } catch (e: any) {
+      alert(e.message || '拒绝失败。');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleCompleteApprove = async () => {
+    if (!activeWithdrawal || !txHash) return;
+    setProcessingId(activeWithdrawal.id);
+    try {
+      await completeWithdrawal(activeWithdrawal.id, txHash);
+      setWithdrawals(prev => prev.filter(w => w.id !== activeWithdrawal.id));
+      setIsApproveOpen(false);
+      setActiveWithdrawal(null);
+      setTxHash('');
+      alert('提现申请已标记为完成。');
+    } catch (e: any) {
+      alert(e.message || '提交失败。');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">财务审核</h2>
+          <p className="text-zinc-400 text-sm">审核并手动处理用户的提现申请。</p>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+          <Wallet size={18} />
+          <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
+        </div>
+      </div>
+
+      <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex items-center gap-2">
+          <Clock size={16} className="text-zinc-500" />
+          <h3 className="text-sm font-semibold">待审批提现 ({withdrawals.length})</h3>
+        </div>
+        
+        <div className="divide-y divide-zinc-800">
+          {loading ? (
+            <div className="p-12 text-center text-zinc-500 animate-pulse">正在获取待审批请求...</div>
+          ) : withdrawals.length === 0 ? (
+            <div className="p-12 text-center text-zinc-500">
+              <CheckCircle2 size={40} className="mx-auto mb-3 opacity-20" />
+              <p>全部处理完毕！目前没有待审批的提现。</p>
+            </div>
+          ) : withdrawals.map(w => (
+            <div key={w.id} className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-800/20 transition-colors">
+              <div className="flex items-start gap-4">
+                <div className="mt-1 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
+                  <Wallet className="text-emerald-500" size={24} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-mono text-zinc-300 break-all">{w.address}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-2xl font-black text-white tracking-tighter">${w.amount.toFixed(2)} USDT</p>
+                    <span className="text-[10px] bg-zinc-800 px-2 py-0.5 rounded uppercase font-bold text-zinc-500 tracking-wider">编号: {w.id}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-1">申请于 {w.createdAt}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleReject(w.id)}
+                  disabled={processingId === w.id}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-lg text-sm font-bold transition-all disabled:opacity-50"
+                >
+                  拒绝
+                </button>
+                <button 
+                  onClick={() => {
+                    setActiveWithdrawal(w);
+                    setIsApproveOpen(true);
+                  }}
+                  disabled={processingId === w.id}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 rounded-lg text-sm font-black transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                >
+                  批准提现
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 批准提现对话框 */}
+      {isApproveOpen && activeWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsApproveOpen(false)} />
+          <div className="relative bg-[#09090b] border border-zinc-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-emerald-500/5 border-b border-zinc-800">
+              <div className="flex items-center gap-3 text-emerald-400 mb-2">
+                <ShieldCheck size={20} />
+                <h3 className="font-bold text-lg">确认批准提现</h3>
+              </div>
+              <p className="text-zinc-500 text-xs">请在链上完成转账后记录交易凭证。</p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="p-4 bg-zinc-900/50 border border-yellow-500/20 rounded-xl flex gap-3 items-start">
+                <AlertTriangle className="text-yellow-500 shrink-0" size={20} />
+                <div className="text-xs space-y-2">
+                  <p className="font-bold text-yellow-500 uppercase tracking-wider">操作指南</p>
+                  <p className="text-zinc-400 leading-relaxed">
+                    1. 打开 MetaMask 或冷钱包。<br/>
+                    2. 向下方地址发送 <strong className="text-white">${activeWithdrawal.amount} USDT</strong>。<br/>
+                    3. 在下方输入链上生成的 <strong className="text-white">交易哈希 (TxHash)</strong>。
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">收款钱包地址</label>
+                <div className="flex items-center gap-2 p-3 bg-zinc-950 rounded-lg border border-zinc-800">
+                  <span className="text-xs font-mono text-zinc-400 truncate flex-1">{activeWithdrawal.address}</span>
+                  <ExternalLink size={14} className="text-zinc-600 cursor-pointer hover:text-emerald-500" onClick={() => navigator.clipboard.writeText(activeWithdrawal.address)} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">交易哈希 (TxHash)</label>
+                <input 
+                  type="text" 
+                  placeholder="0x..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
+                  value={txHash}
+                  onChange={(e) => setTxHash(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="p-6 bg-zinc-900/50 flex items-center gap-3">
+              <button 
+                onClick={() => setIsApproveOpen(false)}
+                className="flex-1 py-3 text-zinc-500 hover:text-white font-bold text-sm transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                onClick={handleCompleteApprove}
+                disabled={!txHash || processingId === activeWithdrawal.id}
+                className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                <Send size={16} />
+                确认并同步状态
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default FinanceOps;
+
