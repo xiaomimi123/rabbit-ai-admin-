@@ -316,6 +316,13 @@ export async function getAdminUserList(params: {
   }>(`/admin/users/list?${query.toString()}`);
 }
 
+// 获取用户 RAT 余额（从链上读取）
+export async function getRatBalance(address: string) {
+  return apiFetch<{
+    balance: string;
+  }>(`/asset/rat-balance?address=${encodeURIComponent(address)}`);
+}
+
 export async function getAdminUser(address: string) {
   return apiFetch<{
     ok: boolean;

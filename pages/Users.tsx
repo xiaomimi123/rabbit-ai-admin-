@@ -24,14 +24,20 @@ import {
   AlertCircle,
   Gem
 } from 'lucide-react';
-import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification } from '../lib/api';
+import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification, getRatBalance } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 
+// 扩展 User 类型，添加 RAT 余额字段
+interface UserWithRatBalance extends User {
+  ratBalance?: number;
+  ratLocked?: number;
+}
+
 const UsersPage: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithRatBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithRatBalance | null>(null);
   const [activeTab, setActiveTab] = useState<'withdrawals' | 'energy' | 'airdrops' | 'messages'>('energy');
   
   // 详情数据状态
@@ -74,7 +80,9 @@ const UsersPage: React.FC = () => {
         offset: 0,
         search: searchTerm || undefined,
       });
-      setUsers(data.items.map((item) => ({
+      
+      // 初始化用户列表，RAT 余额稍后异步获取
+      const usersList = data.items.map((item) => ({
         address: item.address,
         energyTotal: item.energyTotal,
         energyLocked: item.energyLocked,
@@ -83,7 +91,45 @@ const UsersPage: React.FC = () => {
         registeredAt: new Date(item.registeredAt).toLocaleString(),
         lastActive: new Date(item.lastActive).toLocaleString(),
         usdtBalance: item.usdtBalance,
-      })));
+        ratBalance: undefined as number | undefined,
+        ratLocked: 0, // RAT 锁定余额暂时设为 0，后续可以从数据库获取
+      }));
+      
+      setUsers(usersList);
+      
+      // 异步获取每个用户的 RAT 余额（从链上读取）
+      // 使用 Promise.allSettled 避免单个失败影响整体
+      const ratBalancePromises = usersList.map(async (user) => {
+        try {
+          const ratData = await getRatBalance(user.address);
+          return {
+            address: user.address,
+            balance: parseFloat(ratData.balance),
+          };
+        } catch (e) {
+          console.warn(`Failed to fetch RAT balance for ${user.address}:`, e);
+          return {
+            address: user.address,
+            balance: 0,
+          };
+        }
+      });
+      
+      const ratBalances = await Promise.allSettled(ratBalancePromises);
+      
+      // 更新用户列表中的 RAT 余额
+      setUsers((prevUsers) =>
+        prevUsers.map((user) => {
+          const index = usersList.findIndex((u) => u.address === user.address);
+          if (index >= 0 && index < ratBalances.length) {
+            const result = ratBalances[index];
+            if (result.status === 'fulfilled') {
+              return { ...user, ratBalance: result.value.balance };
+            }
+          }
+          return { ...user, ratBalance: user.ratBalance ?? 0 };
+        })
+      );
     } catch (e) {
       console.error(e);
     } finally {
@@ -265,8 +311,17 @@ const UsersPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Gem size={12} className="text-emerald-500" />
-                      <span className="text-sm font-black text-emerald-400">{user.energyTotal}</span>
-                      <span className="text-[10px] text-zinc-600">/ {user.energyLocked} 锁定</span>
+                      {user.ratBalance !== undefined ? (
+                        <>
+                          <span className="text-sm font-black text-emerald-400">{user.ratBalance.toLocaleString()}</span>
+                          <span className="text-[10px] text-zinc-600">/ {user.ratLocked || 0} 锁定</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm font-black text-zinc-500">链上查询中...</span>
+                          <span className="text-[10px] text-zinc-600">/ 锁定</span>
+                        </>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-zinc-300">{user.inviteCount}</td>
@@ -288,8 +343,17 @@ const UsersPage: React.FC = () => {
       {/* 用户详情抽屉 */}
       {selectedUser && (
         <>
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setSelectedUser(null)} />
-          <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#09090b] border-l border-zinc-800 z-50 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedUser(null);
+            }} 
+          />
+          <div 
+            className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#09090b] border-l border-zinc-800 z-50 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
               <div>
                 <h3 className="font-black text-lg uppercase tracking-tight text-white">账户管理</h3>
