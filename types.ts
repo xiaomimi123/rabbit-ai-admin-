@@ -69,7 +69,7 @@ export interface SystemConfig {
   key: string;
   value: string;
   description?: string;
-  category?: 'Business' | 'Technical';
+  category?: 'Business' | 'Technical' | 'Frontend';
 }
 
 export interface YieldTier {

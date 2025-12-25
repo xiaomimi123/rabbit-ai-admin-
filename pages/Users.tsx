@@ -297,7 +297,7 @@ const UsersPage: React.FC = () => {
             <thead className="sticky top-0 bg-[#09090b] z-10">
               <tr className="border-b border-zinc-800">
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">用户</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RAT 持仓 (总计/锁定)</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RAT 持仓/能量值</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">邀请人数</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">操作</th>
               </tr>
@@ -321,12 +321,12 @@ const UsersPage: React.FC = () => {
                       {user.ratBalance !== undefined ? (
                         <>
                           <span className="text-sm font-black text-emerald-400">{user.ratBalance.toLocaleString()}</span>
-                          <span className="text-[10px] text-zinc-600">/ {user.ratLocked || 0} 锁定</span>
+                          <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
                         </>
                       ) : (
                         <>
                           <span className="text-sm font-black text-zinc-500">链上查询中...</span>
-                          <span className="text-[10px] text-zinc-600">/ 锁定</span>
+                          <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
                         </>
                       )}
                     </div>
@@ -372,7 +372,7 @@ const UsersPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">RAT 持仓量</p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">能量值</p>
                   <p className="text-3xl font-black text-emerald-400">{selectedUser.energyTotal}</p>
                 </div>
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
@@ -396,7 +396,7 @@ const UsersPage: React.FC = () => {
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <p className="text-[10px] text-center font-bold text-zinc-600 uppercase tracking-tighter">RAT 代币</p>
+                      <p className="text-[10px] text-center font-bold text-zinc-600 uppercase tracking-tighter">能量值</p>
                       <div className="flex gap-2">
                         <button onClick={() => handleAdjustAsset('RAT', 'add')} className="flex-1 py-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-zinc-950 border border-emerald-500/20 rounded-xl text-[10px] font-black transition-all">增加</button>
                         <button onClick={() => handleAdjustAsset('RAT', 'sub')} className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700 rounded-xl text-[10px] font-black transition-all">扣减</button>
