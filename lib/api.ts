@@ -192,6 +192,34 @@ export async function getUsdtInfo() {
   return apiFetch<{ ok: boolean; address: string; decimals: number; symbol: string }>('/admin/system/usdt');
 }
 
+// 获取管理员支付地址的 USDT 余额
+export async function getAdminUsdtBalance() {
+  return apiFetch<{ ok: boolean; balance: string }>('/admin/usdt-balance');
+}
+
+// 获取 RAT 持币大户排行
+export async function getTopRATHolders(limit: number = 5) {
+  return apiFetch<{
+    ok: boolean;
+    items: Array<{
+      rank: number;
+      address: string;
+      balance: number;
+    }>;
+  }>(`/admin/top-holders?limit=${limit}`);
+}
+
+// 获取收益统计信息
+export async function getRevenueStats() {
+  return apiFetch<{
+    ok: boolean;
+    totalRevenue: string;
+    trend: string; // 百分比
+    estimatedDaily: string;
+    avgFee: string;
+  }>('/admin/revenue/stats');
+}
+
 // 5. YieldStrategy - VIP等级配置
 export async function getVipTiers() {
   return apiFetch<{
