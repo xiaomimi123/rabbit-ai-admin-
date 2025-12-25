@@ -150,11 +150,15 @@ const UsersPage: React.FC = () => {
         // 使用函数式更新，避免依赖 selectedUser 对象本身
         setSelectedUser((prev) => {
           if (!prev) return prev;
+          const usdtTotal = parseFloat(data.user.usdtTotal || '0');
+          const usdtLocked = parseFloat(data.user.usdtLocked || '0');
+          const usdtBalance = usdtTotal - usdtLocked; // 可提现余额 = 总额 - 锁定
           return {
             ...prev,
             energyTotal: parseFloat(data.user.energyTotal),
             energyLocked: parseFloat(data.user.energyLocked),
             inviteCount: parseInt(data.user.inviteCount),
+            usdtBalance: usdtBalance, // 更新可提现 USDT 余额
           };
         });
       }

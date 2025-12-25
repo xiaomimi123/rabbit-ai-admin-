@@ -332,6 +332,8 @@ export async function getAdminUser(address: string) {
       inviteCount: string;
       energyTotal: string;
       energyLocked: string;
+      usdtTotal: string;
+      usdtLocked: string;
       createdAt: string;
       updatedAt: string;
     } | null;
