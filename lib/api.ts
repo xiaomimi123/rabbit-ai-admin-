@@ -365,9 +365,14 @@ export async function adjustUserAsset(params: {
   action: 'add' | 'sub';
   amount: string;
 }) {
-  return apiFetch<{ ok: boolean; address: string; asset: string; newTotal?: number }>('/admin/users/adjust-asset', {
+  const delta = params.action === 'add' ? parseFloat(params.amount) : -parseFloat(params.amount);
+  const endpoint = params.asset === 'RAT' 
+    ? `/admin/users/${encodeURIComponent(params.address)}/energy`
+    : `/admin/users/${encodeURIComponent(params.address)}/usdt`;
+  
+  return apiFetch<{ ok: boolean; address: string; energyTotal?: string; usdtTotal?: string }>(endpoint, {
     method: 'POST',
-    body: JSON.stringify(params),
+    body: JSON.stringify({ delta }),
   });
 }
 
