@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, 
   Filter, 
@@ -66,11 +66,15 @@ const UsersPage: React.FC = () => {
     fetchUsers();
   }, []);
 
+  // 使用 useRef 跟踪上次加载的地址，避免重复调用
+  const lastFetchedAddressRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (selectedUser) {
+    if (selectedUser && selectedUser.address !== lastFetchedAddressRef.current) {
+      lastFetchedAddressRef.current = selectedUser.address;
       fetchUserDetails();
     }
-  }, [selectedUser, activeTab]);
+  }, [selectedUser?.address, activeTab]); // 只依赖 address 而不是整个对象
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -143,12 +147,15 @@ const UsersPage: React.FC = () => {
     try {
       const data = await getAdminUser(selectedUser.address);
       if (data.user) {
-        // 更新selectedUser的数据
-        setSelectedUser({
-          ...selectedUser,
-          energyTotal: parseFloat(data.user.energyTotal),
-          energyLocked: parseFloat(data.user.energyLocked),
-          inviteCount: parseInt(data.user.inviteCount),
+        // 使用函数式更新，避免依赖 selectedUser 对象本身
+        setSelectedUser((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            energyTotal: parseFloat(data.user.energyTotal),
+            energyLocked: parseFloat(data.user.energyLocked),
+            inviteCount: parseInt(data.user.inviteCount),
+          };
         });
       }
       
