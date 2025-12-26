@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Table, Tabs, Statistic, Button, message, Space } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
-import { apiFetch } from '../api';
+import { apiFetch } from '../../lib/api';
 
 type RevenueItem = {
   txHash: string;
