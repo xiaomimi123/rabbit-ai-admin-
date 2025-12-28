@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, 
   Filter, 
@@ -24,14 +24,20 @@ import {
   AlertCircle,
   Gem
 } from 'lucide-react';
-import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification } from '../lib/api';
+import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification, getRatBalance } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 
+// 扩展 User 类型，添加 RAT 余额字段
+interface UserWithRatBalance extends User {
+  ratBalance?: number;
+  ratLocked?: number;
+}
+
 const UsersPage: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithRatBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithRatBalance | null>(null);
   const [activeTab, setActiveTab] = useState<'withdrawals' | 'energy' | 'airdrops' | 'messages'>('energy');
   
   // 详情数据状态
@@ -60,11 +66,15 @@ const UsersPage: React.FC = () => {
     fetchUsers();
   }, []);
 
+  // 使用 useRef 跟踪上次加载的地址，避免重复调用
+  const lastFetchedAddressRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (selectedUser) {
+    if (selectedUser && selectedUser.address !== lastFetchedAddressRef.current) {
+      lastFetchedAddressRef.current = selectedUser.address;
       fetchUserDetails();
     }
-  }, [selectedUser, activeTab]);
+  }, [selectedUser?.address, activeTab]); // 只依赖 address 而不是整个对象
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -74,7 +84,9 @@ const UsersPage: React.FC = () => {
         offset: 0,
         search: searchTerm || undefined,
       });
-      setUsers(data.items.map((item) => ({
+      
+      // 初始化用户列表，RAT 余额稍后异步获取
+      const usersList = data.items.map((item) => ({
         address: item.address,
         energyTotal: item.energyTotal,
         energyLocked: item.energyLocked,
@@ -83,7 +95,45 @@ const UsersPage: React.FC = () => {
         registeredAt: new Date(item.registeredAt).toLocaleString(),
         lastActive: new Date(item.lastActive).toLocaleString(),
         usdtBalance: item.usdtBalance,
-      })));
+        ratBalance: undefined as number | undefined,
+        ratLocked: 0, // RAT 锁定余额暂时设为 0，后续可以从数据库获取
+      }));
+      
+      setUsers(usersList);
+      
+      // 异步获取每个用户的 RAT 余额（从链上读取）
+      // 使用 Promise.allSettled 避免单个失败影响整体
+      const ratBalancePromises = usersList.map(async (user) => {
+        try {
+          const ratData = await getRatBalance(user.address);
+          return {
+            address: user.address,
+            balance: parseFloat(ratData.balance),
+          };
+        } catch (e) {
+          console.warn(`Failed to fetch RAT balance for ${user.address}:`, e);
+          return {
+            address: user.address,
+            balance: 0,
+          };
+        }
+      });
+      
+      const ratBalances = await Promise.allSettled(ratBalancePromises);
+      
+      // 更新用户列表中的 RAT 余额
+      setUsers((prevUsers) =>
+        prevUsers.map((user) => {
+          const index = usersList.findIndex((u) => u.address === user.address);
+          if (index >= 0 && index < ratBalances.length) {
+            const result = ratBalances[index];
+            if (result.status === 'fulfilled') {
+              return { ...user, ratBalance: result.value.balance };
+            }
+          }
+          return { ...user, ratBalance: user.ratBalance ?? 0 };
+        })
+      );
     } catch (e) {
       console.error(e);
     } finally {
@@ -97,12 +147,19 @@ const UsersPage: React.FC = () => {
     try {
       const data = await getAdminUser(selectedUser.address);
       if (data.user) {
-        // 更新selectedUser的数据
-        setSelectedUser({
-          ...selectedUser,
-          energyTotal: parseFloat(data.user.energyTotal),
-          energyLocked: parseFloat(data.user.energyLocked),
-          inviteCount: parseInt(data.user.inviteCount),
+        // 使用函数式更新，避免依赖 selectedUser 对象本身
+        setSelectedUser((prev) => {
+          if (!prev) return prev;
+          const usdtTotal = parseFloat(data.user.usdtTotal || '0');
+          const usdtLocked = parseFloat(data.user.usdtLocked || '0');
+          const usdtBalance = usdtTotal - usdtLocked; // 可提现余额 = 总额 - 锁定
+          return {
+            ...prev,
+            energyTotal: parseFloat(data.user.energyTotal),
+            energyLocked: parseFloat(data.user.energyLocked),
+            inviteCount: parseInt(data.user.inviteCount),
+            usdtBalance: usdtBalance, // 更新可提现 USDT 余额
+          };
         });
       }
       
@@ -244,7 +301,7 @@ const UsersPage: React.FC = () => {
             <thead className="sticky top-0 bg-[#09090b] z-10">
               <tr className="border-b border-zinc-800">
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">用户</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RAT 持仓 (总计/锁定)</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RAT 持仓/能量值</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">邀请人数</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">操作</th>
               </tr>
@@ -265,8 +322,17 @@ const UsersPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Gem size={12} className="text-emerald-500" />
-                      <span className="text-sm font-black text-emerald-400">{user.energyTotal}</span>
-                      <span className="text-[10px] text-zinc-600">/ {user.energyLocked} 锁定</span>
+                      {user.ratBalance !== undefined ? (
+                        <>
+                          <span className="text-sm font-black text-emerald-400">{user.ratBalance.toLocaleString()}</span>
+                          <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm font-black text-zinc-500">链上查询中...</span>
+                          <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
+                        </>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-zinc-300">{user.inviteCount}</td>
@@ -288,8 +354,17 @@ const UsersPage: React.FC = () => {
       {/* 用户详情抽屉 */}
       {selectedUser && (
         <>
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setSelectedUser(null)} />
-          <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#09090b] border-l border-zinc-800 z-50 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedUser(null);
+            }} 
+          />
+          <div 
+            className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#09090b] border-l border-zinc-800 z-50 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
               <div>
                 <h3 className="font-black text-lg uppercase tracking-tight text-white">账户管理</h3>
@@ -301,7 +376,7 @@ const UsersPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">RAT 持仓量</p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">能量值</p>
                   <p className="text-3xl font-black text-emerald-400">{selectedUser.energyTotal}</p>
                 </div>
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
@@ -325,7 +400,7 @@ const UsersPage: React.FC = () => {
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <p className="text-[10px] text-center font-bold text-zinc-600 uppercase tracking-tighter">RAT 代币</p>
+                      <p className="text-[10px] text-center font-bold text-zinc-600 uppercase tracking-tighter">能量值</p>
                       <div className="flex gap-2">
                         <button onClick={() => handleAdjustAsset('RAT', 'add')} className="flex-1 py-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-zinc-950 border border-emerald-500/20 rounded-xl text-[10px] font-black transition-all">增加</button>
                         <button onClick={() => handleAdjustAsset('RAT', 'sub')} className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700 rounded-xl text-[10px] font-black transition-all">扣减</button>

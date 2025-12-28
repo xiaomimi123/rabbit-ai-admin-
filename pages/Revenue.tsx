@@ -5,13 +5,14 @@ import {
   Download, 
   Calendar, 
   TrendingUp, 
+  TrendingDown,
   Search, 
   RefreshCw, 
   ArrowRight,
   ExternalLink,
   Coins
 } from 'lucide-react';
-import { getAdminRevenue } from '../lib/api';
+import { getAdminRevenue, getRevenueStats } from '../lib/api';
 import { RevenueRecord } from '../types';
 
 const RevenuePage: React.FC = () => {
@@ -19,10 +20,26 @@ const RevenuePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('7d');
   const [searchTerm, setSearchTerm] = useState('');
+  const [stats, setStats] = useState<{
+    totalRevenue: string;
+    trend: string;
+    estimatedDaily: string;
+    avgFee: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchRevenue();
+    fetchStats();
   }, [dateRange]);
+
+  const fetchStats = async () => {
+    try {
+      const data = await getRevenueStats();
+      setStats(data);
+    } catch (e) {
+      console.error('获取收益统计失败', e);
+    }
+  };
 
   const fetchRevenue = async () => {
     setLoading(true);
@@ -65,8 +82,13 @@ const RevenuePage: React.FC = () => {
   }, [records, searchTerm]);
 
   const totalRevenue = useMemo(() => {
+    // 如果 stats 有数据，优先使用 stats 的 totalRevenue（今日累计）
+    // 否则使用当前筛选范围内的记录总和
+    if (stats && dateRange === '24h') {
+      return stats.totalRevenue;
+    }
     return records.reduce((acc, curr) => acc + curr.feeAmount, 0).toFixed(4);
-  }, [records]);
+  }, [records, stats, dateRange]);
 
   const handleExport = () => {
     alert('正在准备 CSV 收益报表，请稍候...');
@@ -113,9 +135,12 @@ const RevenuePage: React.FC = () => {
             <h3 className="text-3xl font-black tracking-tighter">{totalRevenue}</h3>
             <span className="text-xs font-bold text-zinc-500">BNB</span>
           </div>
-          <p className="text-[10px] text-emerald-500 mt-2 font-bold flex items-center gap-1">
-            <TrendingUp size={10} /> +12.5% 较上周同期
-          </p>
+          {stats && parseFloat(stats.trend) !== 0 && (
+            <p className={`text-[10px] mt-2 font-bold flex items-center gap-1 ${parseFloat(stats.trend) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {parseFloat(stats.trend) >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {parseFloat(stats.trend) >= 0 ? '+' : ''}{stats.trend}% 较昨日同期
+            </p>
+          )}
         </div>
 
         <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl">
@@ -124,7 +149,7 @@ const RevenuePage: React.FC = () => {
             <Calendar size={16} className="text-blue-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <h3 className="text-3xl font-black tracking-tighter">0.450</h3>
+            <h3 className="text-3xl font-black tracking-tighter">{stats?.estimatedDaily || '0.000'}</h3>
             <span className="text-xs font-bold text-zinc-500">BNB</span>
           </div>
           <p className="text-[10px] text-zinc-500 mt-2">基于当前采集速率估算</p>
@@ -136,7 +161,7 @@ const RevenuePage: React.FC = () => {
             <BarChart3 size={16} className="text-indigo-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <h3 className="text-3xl font-black tracking-tighter">0.005</h3>
+            <h3 className="text-3xl font-black tracking-tighter">{stats?.avgFee || '0.000'}</h3>
             <span className="text-xs font-bold text-zinc-500">BNB</span>
           </div>
           <p className="text-[10px] text-zinc-500 mt-2">系统标准配置费率</p>

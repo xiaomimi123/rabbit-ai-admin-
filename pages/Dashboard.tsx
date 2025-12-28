@@ -1,34 +1,40 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, AlertCircle, Coins, Gem, TrendingUp, TrendingDown, PieChart } from 'lucide-react';
-import { getAdminKPIs } from '../lib/api';
+import { getAdminKPIs, getTopRATHolders } from '../lib/api';
 import { KPIResponse } from '../types';
 
 const Dashboard: React.FC = () => {
   const [kpis, setKpis] = useState<KPIResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [topHolders, setTopHolders] = useState<Array<{ rank: number; address: string; balance: number }>>([]);
 
   const fetchKPIs = useCallback(async () => {
     try {
-      const data = await getAdminKPIs();
+      const [data, holders] = await Promise.all([
+        getAdminKPIs(),
+        getTopRATHolders(5).catch(() => ({ ok: true, items: [] })), // 如果失败，返回空数组
+      ]);
+      
       // 转换后端数据格式为前端格式
       const totalRAT = data.totalHoldings ? parseFloat(data.totalHoldings.amount) : 0;
       const airdropFeesBNB = parseFloat(data.airdropFeeBalance || '0');
       
-      // 计算趋势（这里简化处理，实际应该对比历史数据）
+      // 暂时移除趋势数据（需要历史数据支持，后续可以实现）
       const mockData: KPIResponse = {
         totalUsers: data.usersTotal || 0,
         pendingWithdrawals: Math.ceil(parseFloat(data.pendingWithdrawTotal || '0') / 50), // 估算待处理数量
         airdropFeesBNB: airdropFeesBNB,
         totalRATCirculating: totalRAT,
         trends: {
-          users: 12, // TODO: 从历史数据计算
-          withdrawals: -5,
-          fees: 8.4,
-          rat: 5.2
+          users: 0, // 暂时设为 0，后续可以实现历史对比
+          withdrawals: 0,
+          fees: 0,
+          rat: 0
         }
       };
       setKpis(mockData);
+      setTopHolders(holders.items || []);
     } catch (error) {
       console.error('获取 KPI 失败', error);
     } finally {
@@ -106,7 +112,7 @@ const Dashboard: React.FC = () => {
               }`}>
                 <card.icon size={20} />
               </div>
-              {card.trend !== undefined && (
+              {card.trend !== undefined && card.trend !== 0 && (
                 <div className={`flex items-center text-xs font-medium ${card.trend >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                   {card.trend >= 0 ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
                   {Math.abs(card.trend)}%
@@ -140,20 +146,30 @@ const Dashboard: React.FC = () => {
         <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-2xl h-80 overflow-hidden flex flex-col">
           <h4 className="text-sm font-semibold mb-4 text-white">RAT 持币大户排行</h4>
           <div className="space-y-4 overflow-y-auto pr-2">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-emerald-500">
-                  #{i}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate text-zinc-300">0x71C...3a5{i}</p>
-                  <div className="w-full bg-zinc-800 h-1 rounded-full mt-1">
-                    <div className="bg-emerald-500 h-1 rounded-full" style={{width: `${90 - i * 15}%`}}></div>
+            {topHolders.length === 0 ? (
+              <div className="text-center py-10 text-zinc-500 text-xs">暂无持币数据</div>
+            ) : (
+              topHolders.map((holder) => {
+                const maxBalance = topHolders[0]?.balance || 1;
+                const percentage = (holder.balance / maxBalance) * 100;
+                return (
+                  <div key={holder.address} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-emerald-500">
+                      #{holder.rank}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate text-zinc-300 font-mono">
+                        {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
+                      </p>
+                      <div className="w-full bg-zinc-800 h-1 rounded-full mt-1">
+                        <div className="bg-emerald-500 h-1 rounded-full" style={{width: `${percentage}%`}}></div>
+                      </div>
+                    </div>
+                    <p className="text-[10px] font-mono font-black text-zinc-100">{holder.balance.toFixed(0)} RAT</p>
                   </div>
-                </div>
-                <p className="text-[10px] font-mono font-black text-zinc-100">{2000 - i * 250} RAT</p>
-              </div>
-            ))}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

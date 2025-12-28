@@ -192,6 +192,34 @@ export async function getUsdtInfo() {
   return apiFetch<{ ok: boolean; address: string; decimals: number; symbol: string }>('/admin/system/usdt');
 }
 
+// 获取管理员支付地址的 USDT 余额
+export async function getAdminUsdtBalance() {
+  return apiFetch<{ ok: boolean; balance: string }>('/admin/usdt-balance');
+}
+
+// 获取 RAT 持币大户排行
+export async function getTopRATHolders(limit: number = 5) {
+  return apiFetch<{
+    ok: boolean;
+    items: Array<{
+      rank: number;
+      address: string;
+      balance: number;
+    }>;
+  }>(`/admin/top-holders?limit=${limit}`);
+}
+
+// 获取收益统计信息
+export async function getRevenueStats() {
+  return apiFetch<{
+    ok: boolean;
+    totalRevenue: string;
+    trend: string; // 百分比
+    estimatedDaily: string;
+    avgFee: string;
+  }>('/admin/revenue/stats');
+}
+
 // 5. YieldStrategy - VIP等级配置
 export async function getVipTiers() {
   return apiFetch<{
@@ -288,6 +316,13 @@ export async function getAdminUserList(params: {
   }>(`/admin/users/list?${query.toString()}`);
 }
 
+// 获取用户 RAT 余额（从链上读取）
+export async function getRatBalance(address: string) {
+  return apiFetch<{
+    balance: string;
+  }>(`/asset/rat-balance?address=${encodeURIComponent(address)}`);
+}
+
 export async function getAdminUser(address: string) {
   return apiFetch<{
     ok: boolean;
@@ -297,6 +332,8 @@ export async function getAdminUser(address: string) {
       inviteCount: string;
       energyTotal: string;
       energyLocked: string;
+      usdtTotal: string;
+      usdtLocked: string;
       createdAt: string;
       updatedAt: string;
     } | null;
@@ -330,9 +367,14 @@ export async function adjustUserAsset(params: {
   action: 'add' | 'sub';
   amount: string;
 }) {
-  return apiFetch<{ ok: boolean; address: string; asset: string; newTotal?: number }>('/admin/users/adjust-asset', {
+  const delta = params.action === 'add' ? parseFloat(params.amount) : -parseFloat(params.amount);
+  const endpoint = params.asset === 'RAT' 
+    ? `/admin/users/${encodeURIComponent(params.address)}/energy`
+    : `/admin/users/${encodeURIComponent(params.address)}/usdt`;
+  
+  return apiFetch<{ ok: boolean; address: string; energyTotal?: string; usdtTotal?: string }>(endpoint, {
     method: 'POST',
-    body: JSON.stringify(params),
+    body: JSON.stringify({ delta }),
   });
 }
 
@@ -360,6 +402,31 @@ export async function broadcastNotification(params: {
 }
 
 // 8. SystemConfig - 系统配置
+// 获取系统公告（管理员）
+export async function getSystemAnnouncement() {
+  return apiFetch<{
+    ok: boolean;
+    announcement: {
+      content: string;
+      updatedAt: string;
+    } | null;
+  }>('/admin/system/announcement');
+}
+
+// 更新系统公告（管理员）
+export async function updateSystemAnnouncement(content: string) {
+  return apiFetch<{
+    ok: boolean;
+    announcement: {
+      content: string;
+      updatedAt: string;
+    };
+  }>('/admin/system/announcement', {
+    method: 'PUT',
+    body: JSON.stringify({ content }),
+  });
+}
+
 export async function getSystemConfig() {
   return apiFetch<{
     ok: boolean;

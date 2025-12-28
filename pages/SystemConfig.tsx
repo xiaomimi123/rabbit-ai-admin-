@@ -1,24 +1,53 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Image } from 'lucide-react';
-import { getSystemConfig, updateSystemConfig } from '../lib/api';
+import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Image, Globe, Megaphone } from 'lucide-react';
+import { getSystemConfig, updateSystemConfig, getSystemAnnouncement, updateSystemAnnouncement } from '../lib/api';
 import { SystemConfig } from '../types';
 
 const SystemConfigPage: React.FC = () => {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState<string>('');
+  const [announcementLoading, setAnnouncementLoading] = useState(true);
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
 
   useEffect(() => {
     fetchConfigs();
+    fetchAnnouncement();
   }, []);
+
+  const fetchAnnouncement = async () => {
+    setAnnouncementLoading(true);
+    try {
+      const data = await getSystemAnnouncement();
+      setAnnouncement(data.announcement?.content || '');
+    } catch (e) {
+      console.error('Failed to fetch announcement:', e);
+      setAnnouncement('');
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
+
+  const handleUpdateAnnouncement = async () => {
+    setAnnouncementSaving(true);
+    try {
+      await updateSystemAnnouncement(announcement);
+      alert('公告更新成功！');
+    } catch (e: any) {
+      alert(e.message || '更新失败');
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  };
 
   const fetchConfigs = async () => {
     setLoading(true);
     try {
       const data = await getSystemConfig();
       // 转换后端数据格式为前端格式
-      const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'UI' }> = {
+      const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'UI' | 'Frontend' }> = {
         'WITHDRAWAL_MIN': { value: '10', description: '用户单次提现的最小 USDT 金额。', category: 'Business' },
         'AIRDROP_FEE_BNB': { value: '0.000444', description: '领取空投时用户所需支付的 BNB 燃气费标准。', category: 'Business' },
         'INVITE_BONUS_RAT': { value: '50', description: '每成功邀请一名新用户所获得的 RAT 代币奖励。', category: 'Business' },
@@ -27,6 +56,9 @@ const SystemConfigPage: React.FC = () => {
         'LISTING_COUNTDOWN_TARGET_DATE': { value: '2026-01-15T12:00:00', description: '上线倒计时目标日期（ISO 格式：YYYY-MM-DDTHH:mm:ss）。', category: 'UI' },
         'LISTING_COUNTDOWN_EXCHANGE_NAME': { value: 'Binance', description: '交易所名称，显示在倒计时组件中。', category: 'UI' },
         'LISTING_COUNTDOWN_BG_IMAGE_URL': { value: '', description: '倒计时组件背景图片 URL（可选，留空则使用 CSS 渐变背景）。', category: 'UI' },
+        'FRONTEND_WHITEPAPER_URL': { value: '', description: '前端项目白皮书地址。', category: 'Frontend' },
+        'FRONTEND_AUDIT_REPORT_URL': { value: '', description: '安全审计报告地址。', category: 'Frontend' },
+        'FRONTEND_SUPPORT_URL': { value: '', description: '联系在线客服地址。', category: 'Frontend' },
       };
 
       // 合并后端数据和默认配置
@@ -75,6 +107,7 @@ const SystemConfigPage: React.FC = () => {
   const businessConfigs = configs.filter(c => c.category === 'Business');
   const technicalConfigs = configs.filter(c => c.category === 'Technical');
   const uiConfigs = configs.filter(c => c.category === 'UI');
+  const frontendConfigs = configs.filter(c => c.category === 'Frontend');
 
   const ConfigSection = ({ title, icon: Icon, items }: { title: string, icon: any, items: SystemConfig[] }) => (
     <div className="space-y-4">
@@ -130,9 +163,79 @@ const SystemConfigPage: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* 系统公告管理 */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
+                <Megaphone size={18} className="text-emerald-500" />
+              </div>
+              <h3 className="font-bold text-lg text-white">系统公告管理</h3>
+            </div>
+            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-4 hover:border-zinc-700 transition-all">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-zinc-200">公告内容</label>
+                  <span className="text-xs text-zinc-500">{announcement.length}/5000 字符</span>
+                </div>
+                <textarea
+                  value={announcement}
+                  onChange={(e) => setAnnouncement(e.target.value)}
+                  placeholder="请输入公告内容（支持 HTML 格式，如：&lt;span class=&quot;text-[#FCD535]&quot;&gt;高亮文本&lt;/span&gt;）"
+                  className="w-full min-h-[120px] bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 resize-y"
+                  maxLength={5000}
+                  disabled={announcementLoading || announcementSaving}
+                />
+                <p className="text-xs text-zinc-500">
+                  提示：支持 HTML 标签和 Tailwind CSS 类名。例如：<code className="text-zinc-400">&lt;span class="text-[#FCD535] font-bold"&gt;高亮文本&lt;/span&gt;</code>
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleUpdateAnnouncement}
+                  disabled={announcementLoading || announcementSaving || !announcement.trim()}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:cursor-not-allowed text-zinc-950 font-bold rounded-xl transition-all flex items-center gap-2"
+                >
+                  {announcementSaving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      保存中...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      保存公告
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={fetchAnnouncement}
+                  disabled={announcementLoading || announcementSaving}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-900 disabled:cursor-not-allowed text-zinc-300 rounded-xl transition-all flex items-center gap-2"
+                >
+                  <RefreshCw size={16} className={announcementLoading ? 'animate-spin' : ''} />
+                  刷新
+                </button>
+                {announcement && (
+                  <button
+                    onClick={() => {
+                      if (confirm('确定要清空公告内容吗？')) {
+                        setAnnouncement('');
+                      }
+                    }}
+                    disabled={announcementSaving}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 disabled:bg-zinc-900 disabled:cursor-not-allowed text-red-400 border border-red-500/20 rounded-xl transition-all text-sm"
+                  >
+                    清空
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <ConfigSection title="持币生息策略参数" icon={Settings} items={businessConfigs} />
           <ConfigSection title="核心合约配置" icon={Cpu} items={technicalConfigs} />
           <ConfigSection title="UI 界面配置" icon={Image} items={uiConfigs} />
+          <ConfigSection title="前端链接配置" icon={Globe} items={frontendConfigs} />
         </>
       )}
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck } from 'lucide-react';
-import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo } from '../lib/api';
+import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance } from '../lib/api';
 import { Withdrawal } from '../types';
 
 const FinanceOps: React.FC = () => {
@@ -39,11 +39,11 @@ const FinanceOps: React.FC = () => {
 
   const fetchUsdtBalance = async () => {
     try {
-      // 这里可以调用getUsdtInfo获取USDT合约信息，但余额需要从链上读取
-      // 暂时使用固定值，后续可以添加获取余额的API
-      setUsdtBalance('2400');
+      const data = await getAdminUsdtBalance();
+      setUsdtBalance(data.balance || '0');
     } catch (e) {
-      console.error(e);
+      console.error('获取 USDT 余额失败', e);
+      setUsdtBalance('0'); // 失败时显示 0
     }
   };
 
