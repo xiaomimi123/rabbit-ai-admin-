@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Image, Globe } from 'lucide-react';
+import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe } from 'lucide-react';
 import { getSystemConfig, updateSystemConfig } from '../lib/api';
 import { SystemConfig } from '../types';
 
@@ -19,9 +19,6 @@ const SystemConfigPage: React.FC = () => {
       const data = await getSystemConfig();
       // 转换后端数据格式为前端格式
       const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'UI' | 'Frontend' }> = {
-        'WITHDRAWAL_MIN': { value: '10', description: '用户单次提现的最小 USDT 金额。', category: 'Business' },
-        'AIRDROP_FEE_BNB': { value: '0.000444', description: '领取空投时用户所需支付的 BNB 燃气费标准。', category: 'Business' },
-        'INVITE_BONUS_RAT': { value: '50', description: '每成功邀请一名新用户所获得的 RAT 代币奖励。', category: 'Business' },
         'RAT_CONTRACT_ADDRESS': { value: '', description: 'BSC 网络 RAT 代币合约地址。', category: 'Technical' },
         'USDT_CONTRACT_ADDRESS': { value: '0x55d398326f99059fF775485246999027B3197955', description: 'BSC 网络 USDT 代币合约地址。', category: 'Technical' },
         'LISTING_COUNTDOWN_TARGET_DATE': { value: '2026-01-15T12:00:00', description: '上线倒计时目标日期（ISO 格式：YYYY-MM-DDTHH:mm:ss）。', category: 'UI' },
@@ -75,7 +72,6 @@ const SystemConfigPage: React.FC = () => {
     }
   };
 
-  const businessConfigs = configs.filter(c => c.category === 'Business');
   const technicalConfigs = configs.filter(c => c.category === 'Technical');
   const uiConfigs = configs.filter(c => c.category === 'UI');
   const frontendConfigs = configs.filter(c => c.category === 'Frontend');
@@ -120,7 +116,7 @@ const SystemConfigPage: React.FC = () => {
       <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">系统配置</h2>
-          <p className="text-zinc-400 text-sm">管理 RAT 持币生息相关业务参数与智能合约。</p>
+          <p className="text-zinc-400 text-sm">管理系统参数与智能合约配置。</p>
         </div>
         <button onClick={fetchConfigs} className="p-2 text-zinc-500 hover:text-white transition-colors">
           <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
@@ -134,7 +130,6 @@ const SystemConfigPage: React.FC = () => {
         </div>
       ) : (
         <>
-          <ConfigSection title="持币生息策略参数" icon={Settings} items={businessConfigs} />
           <ConfigSection title="核心合约配置" icon={Cpu} items={technicalConfigs} />
           <ConfigSection title="UI 界面配置" icon={Image} items={uiConfigs} />
           <ConfigSection title="前端链接配置" icon={Globe} items={frontendConfigs} />
@@ -144,7 +139,7 @@ const SystemConfigPage: React.FC = () => {
       <div className="p-6 bg-emerald-500/5 border border-dashed border-emerald-500/20 rounded-2xl flex items-center gap-4">
         <Info className="text-emerald-500 shrink-0" size={24} />
         <p className="text-xs text-zinc-500 leading-relaxed">
-          <strong className="text-zinc-300">安全提示：</strong> RAT 合约地址与奖励参数直接关联资产快照逻辑。修改配置将影响全网用户的利息计算，请务必在非高峰时段操作并进行多重审计。
+          <strong className="text-zinc-300">安全提示：</strong> 修改系统配置将影响应用行为，请务必在非高峰时段操作并进行多重审计。
         </p>
       </div>
     </div>
