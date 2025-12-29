@@ -89,13 +89,21 @@ const SystemConfigPage: React.FC = () => {
   };
 
   const handleUpdate = async (key: string, newValue: string) => {
+    if (!newValue || newValue.trim() === '') {
+      showNotification('error', '配置值不能为空');
+      return;
+    }
+    
     setSavingKey(key);
     try {
-      await updateSystemConfig(key, newValue);
-      setConfigs(prev => prev.map(c => c.key === key ? { ...c, value: newValue } : c));
+      console.log(`[SystemConfig] 保存配置: ${key} = ${newValue}`);
+      await updateSystemConfig(key, newValue.trim());
+      setConfigs(prev => prev.map(c => c.key === key ? { ...c, value: newValue.trim() } : c));
       showNotification('success', `配置 ${key} 保存成功！`);
     } catch (e: any) {
-      showNotification('error', `保存失败: ${e.message || '未知错误'}`);
+      console.error(`[SystemConfig] 保存失败:`, e);
+      const errorMessage = e?.message || e?.toString() || '未知错误';
+      showNotification('error', `保存失败: ${errorMessage}`);
     } finally {
       setSavingKey(null);
     }
