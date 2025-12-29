@@ -138,13 +138,41 @@ const FinanceOps: React.FC = () => {
       return;
     }
 
+    // ✅ 在确认前先检查余额
+    try {
+      const { getUSDTBalance } = await import('../utils/web3');
+      const balance = await getUSDTBalance(usdtContractInfo.address, walletAddress, usdtContractInfo.decimals);
+      const balanceNum = parseFloat(balance);
+      const amountNum = withdrawal.amount;
+
+      if (balanceNum < amountNum) {
+        showNotification('error', `钱包 USDT 余额不足！当前余额: ${balanceNum.toFixed(2)} USDT，需要: ${amountNum.toFixed(2)} USDT`);
+        return;
+      }
+    } catch (e: any) {
+      console.error('检查余额失败:', e);
+      showNotification('warning', '无法检查钱包余额，请确认后继续');
+    }
+
     showConfirm(
       '确认发放提现',
       `确认向 ${withdrawal.address.substring(0, 6)}...${withdrawal.address.substring(38)} 发放 ${withdrawal.amount} USDT？`,
       async () => {
         setProcessingId(withdrawal.id);
         try {
-          // 1. 调用 USDT transfer
+          // 1. 再次检查余额（防止在确认期间余额变化）
+          const { getUSDTBalance } = await import('../utils/web3');
+          const balance = await getUSDTBalance(usdtContractInfo.address, walletAddress, usdtContractInfo.decimals);
+          const balanceNum = parseFloat(balance);
+          const amountNum = withdrawal.amount;
+
+          if (balanceNum < amountNum) {
+            showNotification('error', `钱包 USDT 余额不足！当前余额: ${balanceNum.toFixed(2)} USDT，需要: ${amountNum.toFixed(2)} USDT`);
+            setProcessingId(null);
+            return;
+          }
+
+          // 2. 调用 USDT transfer
           const tx = await transferUSDT(
             usdtContractInfo.address,
             withdrawal.address,
@@ -154,26 +182,39 @@ const FinanceOps: React.FC = () => {
 
           console.log('交易已发送:', tx.hash);
           
-          // 2. 等待交易确认
+          // 3. 等待交易确认
           const receipt = await tx.wait();
           console.log('交易已确认:', receipt.transactionHash);
 
-          // 3. 调用后端 API 更新状态
+          // 4. 调用后端 API 更新状态
           await completeWithdrawal(withdrawal.id, receipt.transactionHash);
           
-          // 4. 刷新列表
+          // 5. 刷新列表
           setWithdrawals(prev => prev.filter(w => w.id !== withdrawal.id));
           fetchUsdtBalance(); // 刷新余额
           
           showNotification('success', `发放成功！交易哈希: ${receipt.transactionHash.substring(0, 10)}...`);
         } catch (e: any) {
           console.error('发放失败:', e);
+          let errorMessage = '发放失败';
+          
           if (e.code === 4001) {
-            showNotification('warning', '用户取消了交易');
-          } else if (e.message?.includes('insufficient funds')) {
-            showNotification('error', '钱包 USDT 余额不足');
+            errorMessage = '用户取消了交易';
+            showNotification('warning', errorMessage);
+          } else if (e.message?.includes('insufficient funds') || e.message?.includes('exceeds balance')) {
+            errorMessage = '钱包 USDT 余额不足，请先充值';
+            showNotification('error', errorMessage);
+          } else if (e.message?.includes('UNPREDICTABLE_GAS_LIMIT')) {
+            // 解析 BEP20 错误信息
+            if (e.message?.includes('transfer amount exceeds balance')) {
+              errorMessage = '钱包 USDT 余额不足，请先充值';
+            } else {
+              errorMessage = '交易可能失败，请检查钱包余额和网络状态';
+            }
+            showNotification('error', errorMessage);
           } else {
-            showNotification('error', `发放失败: ${e.message || '未知错误'}`);
+            errorMessage = e.message || '未知错误';
+            showNotification('error', `发放失败: ${errorMessage}`);
           }
         } finally {
           setProcessingId(null);
