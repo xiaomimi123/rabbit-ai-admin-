@@ -1,17 +1,34 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe } from 'lucide-react';
+import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe, CheckCircle2, XCircle } from 'lucide-react';
 import { getSystemConfig, updateSystemConfig } from '../lib/api';
 import { SystemConfig } from '../types';
+
+interface Notification {
+  id: string;
+  type: 'success' | 'error';
+  message: string;
+}
 
 const SystemConfigPage: React.FC = () => {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     fetchConfigs();
   }, []);
+
+  // 显示通知
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    const id = Date.now().toString();
+    setNotifications(prev => [...prev, { id, type, message }]);
+    // 3秒后自动移除
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 3000);
+  };
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -19,7 +36,7 @@ const SystemConfigPage: React.FC = () => {
       const data = await getSystemConfig();
       // 转换后端数据格式为前端格式
       const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'UI' | 'Frontend' }> = {
-        'RAT_CONTRACT_ADDRESS': { value: '', description: 'BSC 网络 RAT 代币合约地址。', category: 'Technical' },
+        'RAT_CONTRACT_ADDRESS': { value: '0x03853d1B9a6DEeCE10ADf0EE20D836f06aFca47B', description: 'BSC 网络 RAT 代币合约地址。', category: 'Technical' },
         'USDT_CONTRACT_ADDRESS': { value: '0x55d398326f99059fF775485246999027B3197955', description: 'BSC 网络 USDT 代币合约地址。', category: 'Technical' },
         'LISTING_COUNTDOWN_TARGET_DATE': { value: '2026-01-15T12:00:00', description: '上线倒计时目标日期（ISO 格式：YYYY-MM-DDTHH:mm:ss）。', category: 'UI' },
         'LISTING_COUNTDOWN_EXCHANGE_NAME': { value: 'Binance', description: '交易所名称，显示在倒计时组件中。', category: 'UI' },
@@ -53,8 +70,19 @@ const SystemConfigPage: React.FC = () => {
       });
 
       setConfigs(mergedConfigs);
+      
+      // 配置加载完成后，检查并自动填入 RAT 合约地址
+      const ratConfig = mergedConfigs.find(c => c.key === 'RAT_CONTRACT_ADDRESS');
+      const ratAddress = '0x03853d1B9a6DEeCE10ADf0EE20D836f06aFca47B';
+      if (ratConfig && (!ratConfig.value || ratConfig.value.trim() === '')) {
+        // 如果 RAT 合约地址为空，自动填入并保存
+        setTimeout(() => {
+          handleUpdate('RAT_CONTRACT_ADDRESS', ratAddress);
+        }, 500);
+      }
     } catch (e) {
       console.error(e);
+      showNotification('error', '加载配置失败');
     } finally {
       setLoading(false);
     }
@@ -65,8 +93,9 @@ const SystemConfigPage: React.FC = () => {
     try {
       await updateSystemConfig(key, newValue);
       setConfigs(prev => prev.map(c => c.key === key ? { ...c, value: newValue } : c));
+      showNotification('success', `配置 ${key} 保存成功！`);
     } catch (e: any) {
-      alert(e.message || '更新失败');
+      showNotification('error', `保存失败: ${e.message || '未知错误'}`);
     } finally {
       setSavingKey(null);
     }
@@ -113,6 +142,27 @@ const SystemConfigPage: React.FC = () => {
 
   return (
     <div className="space-y-12 max-w-5xl mx-auto">
+      {/* 通知组件 */}
+      <div className="fixed top-20 right-6 z-50 space-y-2">
+        {notifications.map((notification) => (
+          <div
+            key={notification.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-md animate-in slide-in-from-right ${
+              notification.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}
+          >
+            {notification.type === 'success' ? (
+              <CheckCircle2 size={20} />
+            ) : (
+              <XCircle size={20} />
+            )}
+            <span className="text-sm font-medium">{notification.message}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">系统配置</h2>
