@@ -287,10 +287,10 @@ const FinanceOps: React.FC = () => {
                 <Wallet size={18} />
                 <span className="text-xs font-mono">{walletAddress.substring(0, 6)}...{walletAddress.substring(38)}</span>
                 {walletAddressMatched === false && (
-                  <AlertTriangle size={14} className="text-red-400" title="钱包地址与配置不匹配" />
+                  <AlertTriangle size={14} className="text-red-400" />
                 )}
                 {walletAddressMatched === true && (
-                  <CheckCircle2 size={14} className="text-emerald-400" title="钱包地址已验证" />
+                  <CheckCircle2 size={14} className="text-emerald-400" />
                 )}
               </div>
               <button
