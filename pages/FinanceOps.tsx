@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2 } from 'lucide-react';
-import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance } from '../lib/api';
+import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig } from '../lib/api';
 import { Withdrawal } from '../types';
 import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT } from '../utils/web3';
 import { useNotifications, NotificationContainer } from '../components/Notification';
@@ -22,6 +22,10 @@ const FinanceOps: React.FC = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [usdtContractInfo, setUsdtContractInfo] = useState<{ address: string; decimals: number } | null>(null);
+  
+  // 管理员钱包配置
+  const [adminPayoutAddress, setAdminPayoutAddress] = useState<string | null>(null);
+  const [walletAddressMatched, setWalletAddressMatched] = useState<boolean | null>(null);
 
   // 通知系统
   const { notifications, showNotification, removeNotification } = useNotifications();
@@ -34,7 +38,47 @@ const FinanceOps: React.FC = () => {
     fetchUsdtBalance();
     loadUsdtInfo();
     checkWalletConnection();
+    loadAdminPayoutConfig();
   }, []);
+
+  // 加载管理员钱包配置
+  const loadAdminPayoutConfig = async () => {
+    try {
+      const data = await getSystemConfig();
+      const adminPayoutConfig = data.items.find(item => item.key === 'admin_payout');
+      if (adminPayoutConfig) {
+        let address = '';
+        if (typeof adminPayoutConfig.value === 'object' && adminPayoutConfig.value !== null && 'address' in adminPayoutConfig.value) {
+          address = String((adminPayoutConfig.value as any).address || '');
+        } else if (typeof adminPayoutConfig.value === 'string') {
+          try {
+            const parsed = JSON.parse(adminPayoutConfig.value);
+            address = parsed?.address || '';
+          } catch {
+            address = adminPayoutConfig.value;
+          }
+        }
+        setAdminPayoutAddress(address || null);
+      }
+    } catch (e) {
+      console.error('加载管理员钱包配置失败', e);
+    }
+  };
+
+  // 验证钱包地址是否匹配管理员配置
+  useEffect(() => {
+    if (walletAddress && adminPayoutAddress) {
+      const matched = walletAddress.toLowerCase() === adminPayoutAddress.toLowerCase();
+      setWalletAddressMatched(matched);
+      if (!matched) {
+        showNotification('warning', `连接的钱包地址与配置的管理员钱包地址不匹配。配置地址: ${adminPayoutAddress.substring(0, 6)}...${adminPayoutAddress.substring(38)}`);
+      } else {
+        showNotification('success', '钱包地址验证通过，与管理员配置一致');
+      }
+    } else {
+      setWalletAddressMatched(null);
+    }
+  }, [walletAddress, adminPayoutAddress]);
 
   // 检查钱包连接状态
   const checkWalletConnection = async () => {
@@ -71,7 +115,9 @@ const FinanceOps: React.FC = () => {
       if (address) {
         setWalletConnected(true);
         setWalletAddress(address);
-        showNotification('success', `钱包连接成功！地址: ${address.substring(0, 6)}...${address.substring(38)}`);
+        // 验证地址匹配（useEffect 会自动处理）
+        // 同时刷新余额
+        fetchUsdtBalance();
       }
     } catch (e: any) {
       showNotification('error', `连接失败: ${e.message || '未知错误'}`);
@@ -230,38 +276,33 @@ const FinanceOps: React.FC = () => {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {walletConnected && walletAddress ? (
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-              <Wallet size={18} />
-              <span className="text-xs font-mono">{walletAddress.substring(0, 6)}...{walletAddress.substring(38)}</span>
-            </div>
+            <>
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${
+                walletAddressMatched === false
+                  ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                  : walletAddressMatched === true
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-zinc-500/10 border-zinc-500/20 text-zinc-400'
+              }`}>
+                <Wallet size={18} />
+                <span className="text-xs font-mono">{walletAddress.substring(0, 6)}...{walletAddress.substring(38)}</span>
+                {walletAddressMatched === false && (
+                  <AlertTriangle size={14} className="text-red-400" title="钱包地址与配置不匹配" />
+                )}
+                {walletAddressMatched === true && (
+                  <CheckCircle2 size={14} className="text-emerald-400" title="钱包地址已验证" />
+                )}
+              </div>
+              <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                <Wallet size={18} />
+                <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
+              </div>
+            </>
           ) : (
             <button
               onClick={handleConnectWallet}
               disabled={connectingWallet || !checkMetaMask()}
               className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center gap-2 transition-all"
-            >
-              {connectingWallet ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  连接中...
-                </>
-              ) : (
-                <>
-                  <Wallet size={18} />
-                  连接出款钱包
-                </>
-              )}
-            </button>
-          )}
-          <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-            <Wallet size={18} />
-            <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
-          </div>
-          {!walletConnected && (
-            <button
-              onClick={handleConnectWallet}
-              disabled={connectingWallet || !checkMetaMask()}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-black text-sm rounded-xl flex items-center gap-2 transition-all"
               title="连接 MetaMask 钱包以便手动发放提现"
             >
               {connectingWallet ? (
@@ -272,7 +313,7 @@ const FinanceOps: React.FC = () => {
               ) : (
                 <>
                   <Wallet size={18} />
-                  连接钱包
+                  连接出款钱包
                 </>
               )}
             </button>
