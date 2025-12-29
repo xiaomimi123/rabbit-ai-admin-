@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe, CheckCircle2, XCircle } from 'lucide-react';
+import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe, CheckCircle2, XCircle, Wallet } from 'lucide-react';
 import { getSystemConfig, updateSystemConfig } from '../lib/api';
 import { SystemConfig } from '../types';
 
@@ -38,6 +38,7 @@ const SystemConfigPage: React.FC = () => {
       const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'UI' | 'Frontend' }> = {
         'RAT_CONTRACT_ADDRESS': { value: '0x03853d1B9a6DEeCE10ADf0EE20D836f06aFca47B', description: 'BSC 网络 RAT 代币合约地址。', category: 'Technical' },
         'USDT_CONTRACT_ADDRESS': { value: '0x55d398326f99059fF775485246999027B3197955', description: 'BSC 网络 USDT 代币合约地址。', category: 'Technical' },
+        'admin_payout': { value: '', description: '管理员放款钱包地址（用于提现审核，必须配置）。系统会验证从此地址转出的 USDT 交易。', category: 'Business' },
         'LISTING_COUNTDOWN_TARGET_DATE': { value: '2026-01-15T12:00:00', description: '上线倒计时目标日期（ISO 格式：YYYY-MM-DDTHH:mm:ss）。', category: 'UI' },
         'LISTING_COUNTDOWN_EXCHANGE_NAME': { value: 'Binance', description: '交易所名称，显示在倒计时组件中。', category: 'UI' },
         'LISTING_COUNTDOWN_BG_IMAGE_URL': { value: '', description: '倒计时组件背景图片 URL（可选，留空则使用 CSS 渐变背景）。', category: 'UI' },
@@ -49,9 +50,27 @@ const SystemConfigPage: React.FC = () => {
       // 合并后端数据和默认配置
       const mergedConfigs: SystemConfig[] = data.items.map((item) => {
         const defaultConfig = configMap[item.key] || { value: '', description: '', category: 'Technical' as const };
+        let displayValue = '';
+        
+        // 特殊处理 admin_payout：后端存储为 { address: "0x..." } 格式
+        if (item.key === 'admin_payout') {
+          if (typeof item.value === 'object' && item.value !== null && 'address' in item.value) {
+            displayValue = String((item.value as any).address || '');
+          } else if (typeof item.value === 'string') {
+            try {
+              const parsed = JSON.parse(item.value);
+              displayValue = parsed?.address || '';
+            } catch {
+              displayValue = item.value;
+            }
+          }
+        } else {
+          displayValue = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+        }
+        
         return {
           key: item.key,
-          value: typeof item.value === 'string' ? item.value : JSON.stringify(item.value),
+          value: displayValue,
           description: defaultConfig.description,
           category: defaultConfig.category || 'Technical',
         };
@@ -94,10 +113,21 @@ const SystemConfigPage: React.FC = () => {
       return;
     }
     
+    // 特殊处理 admin_payout：需要保存为 { address: "0x..." } 格式
+    let valueToSave: any = newValue.trim();
+    if (key === 'admin_payout') {
+      // 验证地址格式
+      if (!/^0x[a-fA-F0-9]{40}$/.test(newValue.trim())) {
+        showNotification('error', '钱包地址格式不正确，必须是有效的以太坊地址（0x开头，40个十六进制字符）');
+        return;
+      }
+      valueToSave = { address: newValue.trim() };
+    }
+    
     setSavingKey(key);
     try {
-      console.log(`[SystemConfig] 保存配置: ${key} = ${newValue}`);
-      await updateSystemConfig(key, newValue.trim());
+      console.log(`[SystemConfig] 保存配置: ${key} = ${JSON.stringify(valueToSave)}`);
+      await updateSystemConfig(key, valueToSave);
       setConfigs(prev => prev.map(c => c.key === key ? { ...c, value: newValue.trim() } : c));
       showNotification('success', `配置 ${key} 保存成功！`);
     } catch (e: any) {
@@ -110,6 +140,7 @@ const SystemConfigPage: React.FC = () => {
   };
 
   const technicalConfigs = configs.filter(c => c.category === 'Technical');
+  const businessConfigs = configs.filter(c => c.category === 'Business');
   const uiConfigs = configs.filter(c => c.category === 'UI');
   const frontendConfigs = configs.filter(c => c.category === 'Frontend');
 
@@ -216,6 +247,7 @@ const SystemConfigPage: React.FC = () => {
       ) : (
         <>
           <ConfigSection title="核心合约配置" icon={Cpu} items={technicalConfigs} />
+          {businessConfigs.length > 0 && <ConfigSection title="财务配置" icon={Wallet} items={businessConfigs} />}
           <ConfigSection title="UI 界面配置" icon={Image} items={uiConfigs} />
           <ConfigSection title="前端链接配置" icon={Globe} items={frontendConfigs} />
         </>
