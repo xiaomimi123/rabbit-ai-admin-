@@ -98,7 +98,7 @@ const WithdrawalExpenses: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">累计提现支出</span>
@@ -113,17 +113,6 @@ const WithdrawalExpenses: React.FC = () => {
           </p>
         </div>
 
-        <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">今日处理金额</span>
-            <ArrowRightLeft size={16} className="text-blue-500" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-3xl font-black tracking-tighter">$420.00</h3>
-            <span className="text-xs font-bold text-zinc-500">USDT</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 mt-2 font-medium">共计处理 8 笔申请</p>
-        </div>
 
         <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl">
           <div className="flex items-center justify-between mb-2">

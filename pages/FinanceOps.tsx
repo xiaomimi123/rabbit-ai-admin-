@@ -221,6 +221,26 @@ const FinanceOps: React.FC = () => {
             <Wallet size={18} />
             <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
           </div>
+          {!walletConnected && (
+            <button
+              onClick={handleConnectWallet}
+              disabled={connectingWallet || !checkMetaMask()}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-black text-sm rounded-xl flex items-center gap-2 transition-all"
+              title="连接 MetaMask 钱包以便手动发放提现"
+            >
+              {connectingWallet ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  连接中...
+                </>
+              ) : (
+                <>
+                  <Wallet size={18} />
+                  连接钱包
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
