@@ -9,8 +9,7 @@ import {
   ExternalLink,
   ArrowUpRight,
   CheckCircle2,
-  Clock,
-  ArrowRightLeft
+  Clock
 } from 'lucide-react';
 import { getAdminExpenses } from '../lib/api';
 import { Withdrawal } from '../types';
