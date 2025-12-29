@@ -1,46 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Globe, Megaphone } from 'lucide-react';
-import { getSystemConfig, updateSystemConfig, getSystemAnnouncement, updateSystemAnnouncement } from '../lib/api';
+import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Globe } from 'lucide-react';
+import { getSystemConfig, updateSystemConfig } from '../lib/api';
 import { SystemConfig } from '../types';
 
 const SystemConfigPage: React.FC = () => {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState<string>('');
-  const [announcementLoading, setAnnouncementLoading] = useState(true);
-  const [announcementSaving, setAnnouncementSaving] = useState(false);
 
   useEffect(() => {
     fetchConfigs();
-    fetchAnnouncement();
   }, []);
-
-  const fetchAnnouncement = async () => {
-    setAnnouncementLoading(true);
-    try {
-      const data = await getSystemAnnouncement();
-      setAnnouncement(data.announcement?.content || '');
-    } catch (e) {
-      console.error('Failed to fetch announcement:', e);
-      setAnnouncement('');
-    } finally {
-      setAnnouncementLoading(false);
-    }
-  };
-
-  const handleUpdateAnnouncement = async () => {
-    setAnnouncementSaving(true);
-    try {
-      await updateSystemAnnouncement(announcement);
-      alert('公告更新成功！');
-    } catch (e: any) {
-      alert(e.message || '更新失败');
-    } finally {
-      setAnnouncementSaving(false);
-    }
-  };
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -159,75 +130,6 @@ const SystemConfigPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* 系统公告管理 */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
-                <Megaphone size={18} className="text-emerald-500" />
-              </div>
-              <h3 className="font-bold text-lg text-white">系统公告管理</h3>
-            </div>
-            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-4 hover:border-zinc-700 transition-all">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-zinc-200">公告内容</label>
-                  <span className="text-xs text-zinc-500">{announcement.length}/5000 字符</span>
-                </div>
-                <textarea
-                  value={announcement}
-                  onChange={(e) => setAnnouncement(e.target.value)}
-                  placeholder="请输入公告内容（支持 HTML 格式，如：&lt;span class=&quot;text-[#FCD535]&quot;&gt;高亮文本&lt;/span&gt;）"
-                  className="w-full min-h-[120px] bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500 resize-y"
-                  maxLength={5000}
-                  disabled={announcementLoading || announcementSaving}
-                />
-                <p className="text-xs text-zinc-500">
-                  提示：支持 HTML 标签和 Tailwind CSS 类名。例如：<code className="text-zinc-400">&lt;span class="text-[#FCD535] font-bold"&gt;高亮文本&lt;/span&gt;</code>
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleUpdateAnnouncement}
-                  disabled={announcementLoading || announcementSaving || !announcement.trim()}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:cursor-not-allowed text-zinc-950 font-bold rounded-xl transition-all flex items-center gap-2"
-                >
-                  {announcementSaving ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      保存中...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      保存公告
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={fetchAnnouncement}
-                  disabled={announcementLoading || announcementSaving}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-900 disabled:cursor-not-allowed text-zinc-300 rounded-xl transition-all flex items-center gap-2"
-                >
-                  <RefreshCw size={16} className={announcementLoading ? 'animate-spin' : ''} />
-                  刷新
-                </button>
-                {announcement && (
-                  <button
-                    onClick={() => {
-                      if (confirm('确定要清空公告内容吗？')) {
-                        setAnnouncement('');
-                      }
-                    }}
-                    disabled={announcementSaving}
-                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 disabled:bg-zinc-900 disabled:cursor-not-allowed text-red-400 border border-red-500/20 rounded-xl transition-all text-sm"
-                  >
-                    清空
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
           <ConfigSection title="持币生息策略参数" icon={Settings} items={businessConfigs} />
           <ConfigSection title="核心合约配置" icon={Cpu} items={technicalConfigs} />
           <ConfigSection title="前端链接配置" icon={Globe} items={frontendConfigs} />

@@ -402,31 +402,6 @@ export async function broadcastNotification(params: {
 }
 
 // 8. SystemConfig - 系统配置
-// 获取系统公告（管理员）
-export async function getSystemAnnouncement() {
-  return apiFetch<{
-    ok: boolean;
-    announcement: {
-      content: string;
-      updatedAt: string;
-    } | null;
-  }>('/admin/system/announcement');
-}
-
-// 更新系统公告（管理员）
-export async function updateSystemAnnouncement(content: string) {
-  return apiFetch<{
-    ok: boolean;
-    announcement: {
-      content: string;
-      updatedAt: string;
-    };
-  }>('/admin/system/announcement', {
-    method: 'PUT',
-    body: JSON.stringify({ content }),
-  });
-}
-
 export async function getSystemConfig() {
   return apiFetch<{
     ok: boolean;
