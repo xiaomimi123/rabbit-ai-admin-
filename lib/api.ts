@@ -414,8 +414,10 @@ export async function getSystemConfig() {
 }
 
 export async function updateSystemConfig(key: string, value: any) {
+  // 确保 value 是字符串类型
+  const stringValue = typeof value === 'string' ? value : String(value);
   return apiFetch<{ ok: boolean }>(`/admin/system/config/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify(value),
+    body: JSON.stringify(stringValue),
   });
 }

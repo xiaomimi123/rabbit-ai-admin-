@@ -105,40 +105,67 @@ const SystemConfigPage: React.FC = () => {
   const uiConfigs = configs.filter(c => c.category === 'UI');
   const frontendConfigs = configs.filter(c => c.category === 'Frontend');
 
-  const ConfigSection = ({ title, icon: Icon, items }: { title: string, icon: any, items: SystemConfig[] }) => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
-          <Icon size={18} className="text-emerald-500" />
-        </div>
-        <h3 className="font-bold text-lg text-white">{title}</h3>
-      </div>
-      <div className="grid grid-cols-1 gap-4">
-        {items.map((config) => (
-          <div key={config.key} className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 hover:border-zinc-700 transition-all">
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded tracking-widest">{config.key}</span>
-                <Lock size={12} className="text-zinc-600" />
-              </div>
-              <p className="text-sm font-medium text-zinc-200">{config.description}</p>
-            </div>
-            <div className="flex items-center gap-3 w-full lg:w-auto">
-              <input 
-                type="text" 
-                className="flex-1 lg:w-80 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none focus:border-emerald-500"
-                defaultValue={config.value}
-                onBlur={(e) => handleUpdate(config.key, e.target.value)}
-              />
-              <button disabled={savingKey === config.key} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700 rounded-xl transition-all">
-                {savingKey === config.key ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
-              </button>
-            </div>
+  const ConfigSection = ({ title, icon: Icon, items }: { title: string, icon: any, items: SystemConfig[] }) => {
+    // 为每个配置项创建本地状态
+    const [localValues, setLocalValues] = useState<Record<string, string>>({});
+    
+    // 初始化本地值
+    useEffect(() => {
+      const initialValues: Record<string, string> = {};
+      items.forEach(item => {
+        initialValues[item.key] = item.value || '';
+      });
+      setLocalValues(initialValues);
+    }, [items]);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
+            <Icon size={18} className="text-emerald-500" />
           </div>
-        ))}
+          <h3 className="font-bold text-lg text-white">{title}</h3>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {items.map((config) => (
+            <div key={config.key} className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 hover:border-zinc-700 transition-all">
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded tracking-widest">{config.key}</span>
+                  <Lock size={12} className="text-zinc-600" />
+                </div>
+                <p className="text-sm font-medium text-zinc-200">{config.description}</p>
+              </div>
+              <div className="flex items-center gap-3 w-full lg:w-auto">
+                <input 
+                  type="text" 
+                  className="flex-1 lg:w-80 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-mono text-white outline-none focus:border-emerald-500"
+                  value={localValues[config.key] || config.value || ''}
+                  onChange={(e) => setLocalValues(prev => ({ ...prev, [config.key]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleUpdate(config.key, localValues[config.key] || config.value || '');
+                    }
+                  }}
+                />
+                <button 
+                  onClick={() => {
+                    const valueToSave = localValues[config.key] !== undefined ? localValues[config.key] : config.value || '';
+                    handleUpdate(config.key, valueToSave);
+                  }}
+                  disabled={savingKey === config.key}
+                  className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-400 border border-emerald-500/30 rounded-xl transition-all"
+                  title="保存配置"
+                >
+                  {savingKey === config.key ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-12 max-w-5xl mx-auto">
