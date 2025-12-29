@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck } from 'lucide-react';
+import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2 } from 'lucide-react';
 import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance } from '../lib/api';
 import { Withdrawal } from '../types';
+import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT } from '../utils/web3';
 
 const FinanceOps: React.FC = () => {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -13,11 +14,117 @@ const FinanceOps: React.FC = () => {
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [activeWithdrawal, setActiveWithdrawal] = useState<Withdrawal | null>(null);
   const [txHash, setTxHash] = useState('');
+  
+  // MetaMask 连接状态
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [connectingWallet, setConnectingWallet] = useState(false);
+  const [usdtContractInfo, setUsdtContractInfo] = useState<{ address: string; decimals: number } | null>(null);
 
   useEffect(() => {
     fetchPending();
     fetchUsdtBalance();
+    loadUsdtInfo();
+    checkWalletConnection();
   }, []);
+
+  // 检查钱包连接状态
+  const checkWalletConnection = async () => {
+    if (checkMetaMask()) {
+      const address = await getConnectedAddress();
+      if (address) {
+        setWalletConnected(true);
+        setWalletAddress(address);
+      }
+    }
+  };
+
+  // 加载 USDT 合约信息
+  const loadUsdtInfo = async () => {
+    try {
+      const info = await getUsdtInfo();
+      if (info.ok) {
+        setUsdtContractInfo({
+          address: info.address,
+          decimals: info.decimals,
+        });
+      }
+    } catch (e) {
+      console.error('加载 USDT 合约信息失败', e);
+    }
+  };
+
+  // 连接钱包
+  const handleConnectWallet = async () => {
+    setConnectingWallet(true);
+    try {
+      await connectWallet();
+      const address = await getConnectedAddress();
+      if (address) {
+        setWalletConnected(true);
+        setWalletAddress(address);
+        alert(`钱包连接成功！\n地址: ${address.substring(0, 6)}...${address.substring(38)}`);
+      }
+    } catch (e: any) {
+      alert(`连接失败: ${e.message || '未知错误'}`);
+    } finally {
+      setConnectingWallet(false);
+    }
+  };
+
+  // 手动发放（通过 MetaMask）
+  const handleRelease = async (withdrawal: Withdrawal) => {
+    if (!walletConnected || !walletAddress) {
+      alert('请先连接出款钱包');
+      return;
+    }
+
+    if (!usdtContractInfo) {
+      alert('USDT 合约信息未加载，请稍后重试');
+      return;
+    }
+
+    if (!confirm(`确认向 ${withdrawal.address.substring(0, 6)}...${withdrawal.address.substring(38)} 发放 ${withdrawal.amount} USDT？`)) {
+      return;
+    }
+
+    setProcessingId(withdrawal.id);
+    try {
+      // 1. 调用 USDT transfer
+      const tx = await transferUSDT(
+        usdtContractInfo.address,
+        withdrawal.address,
+        withdrawal.amount.toString(),
+        usdtContractInfo.decimals
+      );
+
+      console.log('交易已发送:', tx.hash);
+      
+      // 2. 等待交易确认
+      const receipt = await tx.wait();
+      console.log('交易已确认:', receipt.transactionHash);
+
+      // 3. 调用后端 API 更新状态
+      await completeWithdrawal(withdrawal.id, receipt.transactionHash);
+      
+      // 4. 刷新列表
+      setWithdrawals(prev => prev.filter(w => w.id !== withdrawal.id));
+      fetchUsdtBalance(); // 刷新余额
+      
+      alert(`发放成功！\n交易哈希: ${receipt.transactionHash}`);
+    } catch (e: any) {
+      console.error('发放失败:', e);
+      if (e.code === 4001) {
+        alert('用户取消了交易');
+      } else if (e.message?.includes('insufficient funds')) {
+        alert('钱包 USDT 余额不足');
+      } else {
+        alert(`发放失败: ${e.message || '未知错误'}`);
+      }
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   const fetchPending = async () => {
     setLoading(true);
@@ -80,14 +187,40 @@ const FinanceOps: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">财务审核</h2>
           <p className="text-zinc-400 text-sm">审核并手动处理用户的提现申请。</p>
         </div>
-        <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-          <Wallet size={18} />
-          <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {walletConnected && walletAddress ? (
+            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+              <Wallet size={18} />
+              <span className="text-xs font-mono">{walletAddress.substring(0, 6)}...{walletAddress.substring(38)}</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnectWallet}
+              disabled={connectingWallet || !checkMetaMask()}
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center gap-2 transition-all"
+            >
+              {connectingWallet ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  连接中...
+                </>
+              ) : (
+                <>
+                  <Wallet size={18} />
+                  连接出款钱包
+                </>
+              )}
+            </button>
+          )}
+          <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+            <Wallet size={18} />
+            <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
+          </div>
         </div>
       </div>
 
@@ -123,7 +256,7 @@ const FinanceOps: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button 
                   onClick={() => handleReject(w.id)}
                   disabled={processingId === w.id}
@@ -131,16 +264,36 @@ const FinanceOps: React.FC = () => {
                 >
                   拒绝
                 </button>
-                <button 
-                  onClick={() => {
-                    setActiveWithdrawal(w);
-                    setIsApproveOpen(true);
-                  }}
-                  disabled={processingId === w.id}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 rounded-lg text-sm font-black transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-                >
-                  批准提现
-                </button>
+                {walletConnected ? (
+                  <button 
+                    onClick={() => handleRelease(w)}
+                    disabled={processingId === w.id || !usdtContractInfo}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 rounded-lg text-sm font-black transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {processingId === w.id ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        发放中...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} />
+                        发放 (Release)
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setActiveWithdrawal(w);
+                      setIsApproveOpen(true);
+                    }}
+                    disabled={processingId === w.id}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 rounded-lg text-sm font-black transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    批准提现
+                  </button>
+                )}
               </div>
             </div>
           ))}

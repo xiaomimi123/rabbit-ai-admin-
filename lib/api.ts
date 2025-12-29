@@ -188,6 +188,11 @@ export async function completeWithdrawal(id: string, payoutTxHash: string) {
   );
 }
 
+// 获取 USDT 合约信息（地址和精度）
+export async function getUsdtInfo() {
+  return apiFetch<{ ok: boolean; address: string; decimals: number; symbol: string }>('/admin/system/usdt');
+}
+
 export async function getUsdtInfo() {
   return apiFetch<{ ok: boolean; address: string; decimals: number; symbol: string }>('/admin/system/usdt');
 }
@@ -195,6 +200,11 @@ export async function getUsdtInfo() {
 // 获取管理员支付地址的 USDT 余额
 export async function getAdminUsdtBalance() {
   return apiFetch<{ ok: boolean; balance: string }>('/admin/usdt-balance');
+}
+
+// 获取 USDT 合约信息（地址和精度）
+export async function getUsdtInfo() {
+  return apiFetch<{ ok: boolean; address: string; decimals: number; symbol: string }>('/admin/system/usdt');
 }
 
 // 获取 RAT 持币大户排行
