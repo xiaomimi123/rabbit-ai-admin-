@@ -293,10 +293,14 @@ const FinanceOps: React.FC = () => {
                   <CheckCircle2 size={14} className="text-emerald-400" title="钱包地址已验证" />
                 )}
               </div>
-              <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+              <button
+                onClick={handleConnectWallet}
+                className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/30 rounded-xl text-emerald-400 transition-all cursor-pointer"
+                title="点击重新连接钱包或切换账户"
+              >
                 <Wallet size={18} />
                 <span className="text-sm font-bold tracking-tight">流动性余额: ${parseFloat(usdtBalance).toLocaleString()} USDT</span>
-              </div>
+              </button>
             </>
           ) : (
             <button
