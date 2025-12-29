@@ -141,7 +141,7 @@ const FinanceOps: React.FC = () => {
     // ✅ 在确认前先检查余额
     try {
       const { getUSDTBalance } = await import('../utils/web3');
-      const balance = await getUSDTBalance(usdtContractInfo.address, walletAddress, usdtContractInfo.decimals);
+      const balance = await getUSDTBalance(usdtContractInfo.address, walletAddress);
       const balanceNum = parseFloat(balance);
       const amountNum = withdrawal.amount;
 
@@ -162,7 +162,7 @@ const FinanceOps: React.FC = () => {
         try {
           // 1. 再次检查余额（防止在确认期间余额变化）
           const { getUSDTBalance } = await import('../utils/web3');
-          const balance = await getUSDTBalance(usdtContractInfo.address, walletAddress, usdtContractInfo.decimals);
+          const balance = await getUSDTBalance(usdtContractInfo.address, walletAddress);
           const balanceNum = parseFloat(balance);
           const amountNum = withdrawal.amount;
 
