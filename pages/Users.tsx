@@ -22,7 +22,9 @@ import {
   UserPlus,
   Megaphone,
   AlertCircle,
-  Gem
+  Gem,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification, getRatBalance } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
@@ -61,6 +63,24 @@ const UsersPage: React.FC = () => {
   // 资产调整状态
   const [adjustAmount, setAdjustAmount] = useState<string>('');
   const [isAdjusting, setIsAdjusting] = useState(false);
+  
+  // 通知系统
+  interface Notification {
+    id: string;
+    type: 'success' | 'error';
+    message: string;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  // 显示通知
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    const id = Date.now().toString();
+    setNotifications(prev => [...prev, { id, type, message }]);
+    // 3秒后自动移除
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 3000);
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -196,11 +216,11 @@ const UsersPage: React.FC = () => {
         content: msgContent,
         type: 'SYSTEM',
       });
-      alert('私信已发送');
+      showNotification('success', '私信已发送');
       setMsgTitle('');
       setMsgContent('');
     } catch (e: any) {
-      alert(e.message || '发送失败');
+      showNotification('error', e.message || '发送失败');
     } finally {
       setIsSendingMsg(false);
     }
@@ -215,12 +235,12 @@ const UsersPage: React.FC = () => {
         content: broadcastContent,
         type: 'SYSTEM',
       });
-      alert(`广播已发送，共 ${result.sent} 位用户`);
+      showNotification('success', `广播已发送，共 ${result.sent} 位用户`);
       setIsBroadcastOpen(false);
       setBroadcastTitle('');
       setBroadcastContent('');
     } catch (e: any) {
-      alert(e.message || '发送失败');
+      showNotification('error', e.message || '发送失败');
     } finally {
       setIsSendingBroadcast(false);
     }
