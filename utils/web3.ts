@@ -31,10 +31,12 @@ export async function connectWallet(): Promise<ethers.providers.Web3Provider> {
   // 请求连接账户
   await provider.send('eth_requestAccounts', []);
   
-  // 检查网络
+  // 检查网络，如果不匹配则自动切换
   const network = await provider.getNetwork();
   if (network.chainId !== BSC_CHAIN_ID) {
-    throw new Error(`请切换到 BSC 主网 (Chain ID: ${BSC_CHAIN_ID})，当前网络: ${network.chainId}`);
+    await switchToBSC();
+    // 重新获取 provider（网络切换后）
+    return new ethers.providers.Web3Provider((window as any).ethereum);
   }
   
   return provider;
