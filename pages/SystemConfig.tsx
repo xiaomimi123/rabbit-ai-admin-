@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Globe } from 'lucide-react';
+import { Settings, Save, RefreshCw, Lock, Info, Wallet, Cpu, Image, Globe } from 'lucide-react';
 import { getSystemConfig, updateSystemConfig } from '../lib/api';
 import { SystemConfig } from '../types';
 
@@ -18,12 +18,15 @@ const SystemConfigPage: React.FC = () => {
     try {
       const data = await getSystemConfig();
       // 转换后端数据格式为前端格式
-      const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'Frontend' }> = {
+      const configMap: Record<string, { value: any; description?: string; category?: 'Business' | 'Technical' | 'UI' | 'Frontend' }> = {
         'WITHDRAWAL_MIN': { value: '10', description: '用户单次提现的最小 USDT 金额。', category: 'Business' },
         'AIRDROP_FEE_BNB': { value: '0.000444', description: '领取空投时用户所需支付的 BNB 燃气费标准。', category: 'Business' },
         'INVITE_BONUS_RAT': { value: '50', description: '每成功邀请一名新用户所获得的 RAT 代币奖励。', category: 'Business' },
         'RAT_CONTRACT_ADDRESS': { value: '', description: 'BSC 网络 RAT 代币合约地址。', category: 'Technical' },
         'USDT_CONTRACT_ADDRESS': { value: '0x55d398326f99059fF775485246999027B3197955', description: 'BSC 网络 USDT 代币合约地址。', category: 'Technical' },
+        'LISTING_COUNTDOWN_TARGET_DATE': { value: '2026-01-15T12:00:00', description: '上线倒计时目标日期（ISO 格式：YYYY-MM-DDTHH:mm:ss）。', category: 'UI' },
+        'LISTING_COUNTDOWN_EXCHANGE_NAME': { value: 'Binance', description: '交易所名称，显示在倒计时组件中。', category: 'UI' },
+        'LISTING_COUNTDOWN_BG_IMAGE_URL': { value: '', description: '倒计时组件背景图片 URL（可选，留空则使用 CSS 渐变背景）。', category: 'UI' },
         'FRONTEND_WHITEPAPER_URL': { value: '', description: '前端项目白皮书地址。', category: 'Frontend' },
         'FRONTEND_AUDIT_REPORT_URL': { value: '', description: '安全审计报告地址。', category: 'Frontend' },
         'FRONTEND_SUPPORT_URL': { value: '', description: '联系在线客服地址。', category: 'Frontend' },
@@ -36,7 +39,7 @@ const SystemConfigPage: React.FC = () => {
           key: item.key,
           value: typeof item.value === 'string' ? item.value : JSON.stringify(item.value),
           description: defaultConfig.description,
-          category: defaultConfig.category,
+          category: defaultConfig.category || 'Technical',
         };
       });
 
@@ -74,6 +77,7 @@ const SystemConfigPage: React.FC = () => {
 
   const businessConfigs = configs.filter(c => c.category === 'Business');
   const technicalConfigs = configs.filter(c => c.category === 'Technical');
+  const uiConfigs = configs.filter(c => c.category === 'UI');
   const frontendConfigs = configs.filter(c => c.category === 'Frontend');
 
   const ConfigSection = ({ title, icon: Icon, items }: { title: string, icon: any, items: SystemConfig[] }) => (
@@ -132,6 +136,7 @@ const SystemConfigPage: React.FC = () => {
         <>
           <ConfigSection title="持币生息策略参数" icon={Settings} items={businessConfigs} />
           <ConfigSection title="核心合约配置" icon={Cpu} items={technicalConfigs} />
+          <ConfigSection title="UI 界面配置" icon={Image} items={uiConfigs} />
           <ConfigSection title="前端链接配置" icon={Globe} items={frontendConfigs} />
         </>
       )}
