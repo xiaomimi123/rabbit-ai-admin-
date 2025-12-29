@@ -169,7 +169,9 @@ const UsersPage: React.FC = () => {
         });
       }
       
-      if (activeTab === 'withdrawals') {
+      // ✅ 修复：无论当前标签是什么，都加载所有数据
+      // 这样切换标签时就能立即显示数据，不需要重新加载
+      if (data.withdrawals && data.withdrawals.length > 0) {
         setWithdrawals(data.withdrawals.map((w: any) => ({
           id: w.id,
           address: selectedUser.address,
@@ -177,13 +179,19 @@ const UsersPage: React.FC = () => {
           status: w.status as 'Pending' | 'Completed' | 'Rejected',
           createdAt: new Date(w.createdAt).toLocaleString(),
         })));
-      } else if (activeTab === 'airdrops') {
+      } else {
+        setWithdrawals([]);
+      }
+      
+      if (data.claims && data.claims.length > 0) {
         setAirdropClaims(data.claims.map((c: any) => ({
           id: c.txHash,
           amount: parseFloat(c.amount),
           type: '空投领取',
           timestamp: new Date(c.createdAt).toLocaleString(),
         })));
+      } else {
+        setAirdropClaims([]);
       }
     } catch (e) {
       console.error(e);
