@@ -289,6 +289,27 @@ const UsersPage: React.FC = () => {
 
   return (
     <div className="space-y-6 relative overflow-hidden h-full flex flex-col">
+      {/* 通知组件 */}
+      <div className="fixed top-20 right-6 z-[60] space-y-2">
+        {notifications.map((notification) => (
+          <div
+            key={notification.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-md animate-in slide-in-from-right ${
+              notification.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}
+          >
+            {notification.type === 'success' ? (
+              <CheckCircle2 size={20} />
+            ) : (
+              <XCircle size={20} />
+            )}
+            <span className="text-sm font-medium">{notification.message}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">用户管理</h2>
