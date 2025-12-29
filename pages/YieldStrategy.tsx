@@ -12,11 +12,13 @@ import {
 } from 'lucide-react';
 import { getVipTiers, updateVipTier } from '../lib/api';
 import { YieldTier } from '../types';
+import { useNotifications, NotificationContainer } from '../components/Notification';
 
 const YieldStrategy: React.FC = () => {
   const [tiers, setTiers] = useState<YieldTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { notifications, showNotification, removeNotification } = useNotifications();
 
   useEffect(() => {
     fetchTiers();
@@ -56,7 +58,7 @@ const YieldStrategy: React.FC = () => {
 
   const handleDeleteTier = (id: number) => {
     if (tiers.length <= 1) {
-      alert('请至少保留一个收益等级。');
+      showNotification('warning', '请至少保留一个收益等级。');
       return;
     }
     setTiers(tiers.filter(t => t.id !== id));
@@ -88,12 +90,12 @@ const YieldStrategy: React.FC = () => {
         });
       }
       
-      alert('收益策略已更新，即时生效！');
+      showNotification('success', '收益策略已更新，即时生效！');
       // 重新拉取一次确保数据同步
       fetchTiers();
     } catch (error: any) {
       console.error('保存失败', error);
-      alert(error.message || '保存配置失败，请检查网络或管理员权限。');
+      showNotification('error', error.message || '保存配置失败，请检查网络或管理员权限。');
     } finally {
       setSaving(false);
     }
@@ -101,6 +103,7 @@ const YieldStrategy: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto pb-20">
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">等级收益规则配置</h2>

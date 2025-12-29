@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { getAdminRevenue, getRevenueStats } from '../lib/api';
 import { RevenueRecord } from '../types';
+import { useNotifications, NotificationContainer } from '../components/Notification';
 
 const RevenuePage: React.FC = () => {
   const [records, setRecords] = useState<RevenueRecord[]>([]);
@@ -26,6 +27,7 @@ const RevenuePage: React.FC = () => {
     estimatedDaily: string;
     avgFee: string;
   } | null>(null);
+  const { notifications, showNotification, removeNotification } = useNotifications();
 
   useEffect(() => {
     fetchRevenue();
@@ -91,12 +93,13 @@ const RevenuePage: React.FC = () => {
   }, [records, stats, dateRange]);
 
   const handleExport = () => {
-    alert('正在准备 CSV 收益报表，请稍候...');
+    showNotification('info', '正在准备 CSV 收益报表，请稍候...');
     // 实际逻辑：生成 CSV 并触发下载
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">收益明细</h2>

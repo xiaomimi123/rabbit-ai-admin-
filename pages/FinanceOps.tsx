@@ -4,6 +4,8 @@ import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldC
 import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance } from '../lib/api';
 import { Withdrawal } from '../types';
 import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT } from '../utils/web3';
+import { useNotifications, NotificationContainer } from '../components/Notification';
+import { useConfirmDialog, ConfirmDialog } from '../components/ConfirmDialog';
 
 const FinanceOps: React.FC = () => {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -20,6 +22,12 @@ const FinanceOps: React.FC = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [usdtContractInfo, setUsdtContractInfo] = useState<{ address: string; decimals: number } | null>(null);
+
+  // 通知系统
+  const { notifications, showNotification, removeNotification } = useNotifications();
+  
+  // 确认对话框
+  const { isOpen: isConfirmOpen, config: confirmConfig, showConfirm, handleCancel: handleConfirmCancel } = useConfirmDialog();
 
   useEffect(() => {
     fetchPending();
@@ -63,10 +71,10 @@ const FinanceOps: React.FC = () => {
       if (address) {
         setWalletConnected(true);
         setWalletAddress(address);
-        alert(`钱包连接成功！\n地址: ${address.substring(0, 6)}...${address.substring(38)}`);
+        showNotification('success', `钱包连接成功！地址: ${address.substring(0, 6)}...${address.substring(38)}`);
       }
     } catch (e: any) {
-      alert(`连接失败: ${e.message || '未知错误'}`);
+      showNotification('error', `连接失败: ${e.message || '未知错误'}`);
     } finally {
       setConnectingWallet(false);
     }
@@ -75,55 +83,61 @@ const FinanceOps: React.FC = () => {
   // 手动发放（通过 MetaMask）
   const handleRelease = async (withdrawal: Withdrawal) => {
     if (!walletConnected || !walletAddress) {
-      alert('请先连接出款钱包');
+      showNotification('warning', '请先连接出款钱包');
       return;
     }
 
     if (!usdtContractInfo) {
-      alert('USDT 合约信息未加载，请稍后重试');
+      showNotification('error', 'USDT 合约信息未加载，请稍后重试');
       return;
     }
 
-    if (!confirm(`确认向 ${withdrawal.address.substring(0, 6)}...${withdrawal.address.substring(38)} 发放 ${withdrawal.amount} USDT？`)) {
-      return;
-    }
+    showConfirm(
+      '确认发放提现',
+      `确认向 ${withdrawal.address.substring(0, 6)}...${withdrawal.address.substring(38)} 发放 ${withdrawal.amount} USDT？`,
+      async () => {
+        setProcessingId(withdrawal.id);
+        try {
+          // 1. 调用 USDT transfer
+          const tx = await transferUSDT(
+            usdtContractInfo.address,
+            withdrawal.address,
+            withdrawal.amount.toString(),
+            usdtContractInfo.decimals
+          );
 
-    setProcessingId(withdrawal.id);
-    try {
-      // 1. 调用 USDT transfer
-      const tx = await transferUSDT(
-        usdtContractInfo.address,
-        withdrawal.address,
-        withdrawal.amount.toString(),
-        usdtContractInfo.decimals
-      );
+          console.log('交易已发送:', tx.hash);
+          
+          // 2. 等待交易确认
+          const receipt = await tx.wait();
+          console.log('交易已确认:', receipt.transactionHash);
 
-      console.log('交易已发送:', tx.hash);
-      
-      // 2. 等待交易确认
-      const receipt = await tx.wait();
-      console.log('交易已确认:', receipt.transactionHash);
-
-      // 3. 调用后端 API 更新状态
-      await completeWithdrawal(withdrawal.id, receipt.transactionHash);
-      
-      // 4. 刷新列表
-      setWithdrawals(prev => prev.filter(w => w.id !== withdrawal.id));
-      fetchUsdtBalance(); // 刷新余额
-      
-      alert(`发放成功！\n交易哈希: ${receipt.transactionHash}`);
-    } catch (e: any) {
-      console.error('发放失败:', e);
-      if (e.code === 4001) {
-        alert('用户取消了交易');
-      } else if (e.message?.includes('insufficient funds')) {
-        alert('钱包 USDT 余额不足');
-      } else {
-        alert(`发放失败: ${e.message || '未知错误'}`);
+          // 3. 调用后端 API 更新状态
+          await completeWithdrawal(withdrawal.id, receipt.transactionHash);
+          
+          // 4. 刷新列表
+          setWithdrawals(prev => prev.filter(w => w.id !== withdrawal.id));
+          fetchUsdtBalance(); // 刷新余额
+          
+          showNotification('success', `发放成功！交易哈希: ${receipt.transactionHash.substring(0, 10)}...`);
+        } catch (e: any) {
+          console.error('发放失败:', e);
+          if (e.code === 4001) {
+            showNotification('warning', '用户取消了交易');
+          } else if (e.message?.includes('insufficient funds')) {
+            showNotification('error', '钱包 USDT 余额不足');
+          } else {
+            showNotification('error', `发放失败: ${e.message || '未知错误'}`);
+          }
+        } finally {
+          setProcessingId(null);
+        }
+      },
+      {
+        confirmText: '确认发放',
+        type: 'warning',
       }
-    } finally {
-      setProcessingId(null);
-    }
+    );
   };
 
   const fetchPending = async () => {
@@ -155,17 +169,26 @@ const FinanceOps: React.FC = () => {
   };
 
   const handleReject = async (id: string) => {
-    if (!confirm('您确定要拒绝这笔提现申请吗？此操作无法撤销。')) return;
-    setProcessingId(id);
-    try {
-      await rejectWithdrawal(id);
-      setWithdrawals(prev => prev.filter(w => w.id !== id));
-      alert('提现已成功拒绝。');
-    } catch (e: any) {
-      alert(e.message || '拒绝失败。');
-    } finally {
-      setProcessingId(null);
-    }
+    showConfirm(
+      '确认拒绝提现',
+      '您确定要拒绝这笔提现申请吗？此操作无法撤销。',
+      async () => {
+        setProcessingId(id);
+        try {
+          await rejectWithdrawal(id);
+          setWithdrawals(prev => prev.filter(w => w.id !== id));
+          showNotification('success', '提现已成功拒绝。');
+        } catch (e: any) {
+          showNotification('error', e.message || '拒绝失败。');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+      {
+        confirmText: '确认拒绝',
+        type: 'danger',
+      }
+    );
   };
 
   const handleCompleteApprove = async () => {
@@ -177,9 +200,9 @@ const FinanceOps: React.FC = () => {
       setIsApproveOpen(false);
       setActiveWithdrawal(null);
       setTxHash('');
-      alert('提现申请已标记为完成。');
+      showNotification('success', '提现申请已标记为完成。');
     } catch (e: any) {
-      alert(e.message || '提交失败。');
+      showNotification('error', e.message || '提交失败。');
     } finally {
       setProcessingId(null);
     }
@@ -187,6 +210,19 @@ const FinanceOps: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      {confirmConfig && (
+        <ConfirmDialog
+          isOpen={isConfirmOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          cancelText={confirmConfig.cancelText}
+          type={confirmConfig.type}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={handleConfirmCancel}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">财务审核</h2>

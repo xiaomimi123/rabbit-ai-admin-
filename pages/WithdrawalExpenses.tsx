@@ -13,12 +13,14 @@ import {
 } from 'lucide-react';
 import { getAdminExpenses } from '../lib/api';
 import { Withdrawal } from '../types';
+import { useNotifications, NotificationContainer } from '../components/Notification';
 
 const WithdrawalExpenses: React.FC = () => {
   const [records, setRecords] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState('7d');
+  const { notifications, showNotification, removeNotification } = useNotifications();
 
   useEffect(() => {
     fetchExpenses();
@@ -69,6 +71,7 @@ const WithdrawalExpenses: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">支出明细</h2>
@@ -89,7 +92,7 @@ const WithdrawalExpenses: React.FC = () => {
             ))}
           </div>
           <button 
-            onClick={() => alert('正在生成提现明细 CSV 报表...')}
+            onClick={() => showNotification('info', '正在生成提现明细 CSV 报表...')}
             className="flex items-center gap-2 px-4 py-2.5 bg-zinc-100 hover:bg-white text-zinc-950 font-black text-xs rounded-xl transition-all shadow-lg"
           >
             <Download size={14} /> 导出账单

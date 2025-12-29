@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification, getRatBalance } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
+import { useNotifications, NotificationContainer } from '../components/Notification';
 
 // 扩展 User 类型，添加 RAT 余额字段
 interface UserWithRatBalance extends User {
@@ -65,22 +66,7 @@ const UsersPage: React.FC = () => {
   const [isAdjusting, setIsAdjusting] = useState(false);
   
   // 通知系统
-  interface Notification {
-    id: string;
-    type: 'success' | 'error';
-    message: string;
-  }
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  // 显示通知
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    const id = Date.now().toString();
-    setNotifications(prev => [...prev, { id, type, message }]);
-    // 3秒后自动移除
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 3000);
-  };
+  const { notifications, showNotification, removeNotification } = useNotifications();
 
   useEffect(() => {
     fetchUsers();
@@ -256,14 +242,14 @@ const UsersPage: React.FC = () => {
         action,
         amount: adjustAmount,
       });
-      alert(`${asset} 资产已${action === 'add' ? '增加' : '扣除'}: ${adjustAmount}`);
+      showNotification('success', `${asset} 资产已${action === 'add' ? '增加' : '扣除'}: ${adjustAmount}`);
       setAdjustAmount('');
       fetchUsers();
       if (selectedUser) {
         fetchUserDetails();
       }
     } catch (e: any) {
-      alert(e.message || '调整失败');
+      showNotification('error', e.message || '调整失败');
     } finally {
       setIsAdjusting(false);
     }
@@ -289,26 +275,7 @@ const UsersPage: React.FC = () => {
 
   return (
     <div className="space-y-6 relative overflow-hidden h-full flex flex-col">
-      {/* 通知组件 */}
-      <div className="fixed top-20 right-6 z-[60] space-y-2">
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-md animate-in slide-in-from-right ${
-              notification.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                : 'bg-red-500/10 border-red-500/20 text-red-400'
-            }`}
-          >
-            {notification.type === 'success' ? (
-              <CheckCircle2 size={20} />
-            ) : (
-              <XCircle size={20} />
-            )}
-            <span className="text-sm font-medium">{notification.message}</span>
-          </div>
-        ))}
-      </div>
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
