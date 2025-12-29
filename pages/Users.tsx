@@ -72,13 +72,21 @@ const UsersPage: React.FC = () => {
     fetchUsers();
   }, []);
 
-  // 使用 useRef 跟踪上次加载的地址，避免重复调用
+  // 使用 useRef 跟踪上次加载的地址和标签，避免重复调用
   const lastFetchedAddressRef = useRef<string | null>(null);
+  const lastFetchedTabRef = useRef<string | null>(null);
   
+  // 当选中用户或标签页变化时，重新加载数据
   useEffect(() => {
-    if (selectedUser && selectedUser.address !== lastFetchedAddressRef.current) {
-      lastFetchedAddressRef.current = selectedUser.address;
-      fetchUserDetails();
+    if (selectedUser) {
+      const addressChanged = selectedUser.address !== lastFetchedAddressRef.current;
+      const tabChanged = activeTab !== lastFetchedTabRef.current;
+      
+      if (addressChanged || tabChanged) {
+        lastFetchedAddressRef.current = selectedUser.address;
+        lastFetchedTabRef.current = activeTab;
+        fetchUserDetails();
+      }
     }
   }, [selectedUser?.address, activeTab]); // 只依赖 address 而不是整个对象
 
