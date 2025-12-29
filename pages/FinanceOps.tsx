@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2 } from 'lucide-react';
-import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig } from '../lib/api';
+import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig, updateSystemConfig } from '../lib/api';
 import { Withdrawal } from '../types';
 import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT } from '../utils/web3';
 import { useNotifications, NotificationContainer } from '../components/Notification';
@@ -115,6 +115,20 @@ const FinanceOps: React.FC = () => {
       if (address) {
         setWalletConnected(true);
         setWalletAddress(address);
+        
+        // ✅ 自动保存钱包地址到 admin_payout 配置
+        try {
+          await updateSystemConfig('admin_payout', { address: address });
+          console.log('[FinanceOps] 钱包地址已自动保存到 admin_payout 配置');
+          showNotification('success', '钱包连接成功，地址已自动保存到系统配置');
+        } catch (saveError: any) {
+          console.error('[FinanceOps] 保存钱包地址失败:', saveError);
+          showNotification('warning', '钱包连接成功，但保存配置失败，请手动在系统配置中保存');
+        }
+        
+        // 更新本地配置状态
+        setAdminPayoutAddress(address);
+        
         // 验证地址匹配（useEffect 会自动处理）
         // 同时刷新余额
         fetchUsdtBalance();

@@ -415,10 +415,24 @@ export async function getSystemConfig() {
 }
 
 export async function updateSystemConfig(key: string, value: any) {
-  // 确保 value 是字符串类型
-  const stringValue = typeof value === 'string' ? value : String(value);
+  // ✅ 特殊处理 admin_payout：需要保存为对象格式 { address: "0x..." }
+  let bodyValue: any;
+  if (key === 'admin_payout') {
+    // 如果已经是对象格式，直接使用；否则转换为对象
+    if (typeof value === 'object' && value !== null && 'address' in value) {
+      bodyValue = value;
+    } else if (typeof value === 'string') {
+      bodyValue = { address: value.trim() };
+    } else {
+      bodyValue = { address: String(value).trim() };
+    }
+  } else {
+    // 其他配置项保存为字符串
+    bodyValue = typeof value === 'string' ? value : String(value);
+  }
+  
   return apiFetch<{ ok: boolean }>(`/admin/system/config/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify(stringValue),
+    body: JSON.stringify(bodyValue),
   });
 }
