@@ -20,13 +20,12 @@ import {
   MessageSquare,
   RefreshCw,
   UserPlus,
-  Megaphone,
   AlertCircle,
   Gem,
   CheckCircle2,
   XCircle
 } from 'lucide-react';
-import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, broadcastNotification, getRatBalance } from '../lib/api';
+import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getRatBalance } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 
@@ -55,11 +54,6 @@ const UsersPage: React.FC = () => {
   const [msgContent, setMsgContent] = useState('');
   const [isSendingMsg, setIsSendingMsg] = useState(false);
   
-  // 广播表单状态 (针对所有用户)
-  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
-  const [broadcastTitle, setBroadcastTitle] = useState('');
-  const [broadcastContent, setBroadcastContent] = useState('');
-  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
   
   // 资产调整状态
   const [adjustAmount, setAdjustAmount] = useState<string>('');
@@ -228,25 +222,6 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  const handleBroadcast = async () => {
-    if (!broadcastTitle || !broadcastContent) return;
-    setIsSendingBroadcast(true);
-    try {
-      const result = await broadcastNotification({
-        title: broadcastTitle,
-        content: broadcastContent,
-        type: 'SYSTEM',
-      });
-      showNotification('success', `广播已发送，共 ${result.sent} 位用户`);
-      setIsBroadcastOpen(false);
-      setBroadcastTitle('');
-      setBroadcastContent('');
-    } catch (e: any) {
-      showNotification('error', e.message || '发送失败');
-    } finally {
-      setIsSendingBroadcast(false);
-    }
-  };
 
   const handleAdjustAsset = async (asset: 'RAT' | 'USDT', action: 'add' | 'sub') => {
     if (!selectedUser || !adjustAmount) return;
@@ -303,12 +278,6 @@ const UsersPage: React.FC = () => {
           <h2 className="text-2xl font-bold tracking-tight text-white">用户管理</h2>
           <p className="text-zinc-400 text-sm">监控用户 RAT 持仓与 USDT 收益状态。</p>
         </div>
-        <button 
-          onClick={() => setIsBroadcastOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all"
-        >
-          <Megaphone size={14} /> 全员广播通知
-        </button>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -548,61 +517,6 @@ const UsersPage: React.FC = () => {
       )}
 
       {/* 广播通知模态框 */}
-      {isBroadcastOpen && (
-        <>
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in" onClick={() => setIsBroadcastOpen(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="relative bg-[#09090b] border border-zinc-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 bg-indigo-500/5 border-b border-zinc-800">
-                <div className="flex items-center gap-3 text-indigo-400 mb-2">
-                  <Megaphone size={20} />
-                  <h3 className="font-bold text-lg">全员广播通知</h3>
-                </div>
-                <p className="text-zinc-500 text-xs">向所有用户发送系统通知。</p>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">通知标题</label>
-                  <input 
-                    type="text" 
-                    placeholder="输入通知标题..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-sm outline-none focus:border-indigo-500"
-                    value={broadcastTitle}
-                    onChange={(e) => setBroadcastTitle(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">通知内容</label>
-                  <textarea 
-                    placeholder="输入通知内容..."
-                    className="w-full h-32 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-sm outline-none focus:border-indigo-500 resize-none"
-                    value={broadcastContent}
-                    onChange={(e) => setBroadcastContent(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="p-6 bg-zinc-900/50 flex items-center gap-3">
-                <button 
-                  onClick={() => setIsBroadcastOpen(false)}
-                  className="flex-1 py-3 text-zinc-500 hover:text-white font-bold text-sm transition-colors"
-                >
-                  取消
-                </button>
-                <button 
-                  onClick={handleBroadcast}
-                  disabled={!broadcastTitle || !broadcastContent || isSendingBroadcast}
-                  className="flex-[2] py-3 bg-indigo-500 hover:bg-indigo-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center justify-center gap-2 transition-all"
-                >
-                  {isSendingBroadcast ? <RefreshCw className="animate-spin" size={16} /> : <Megaphone size={16} />}
-                  发送广播
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 };

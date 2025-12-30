@@ -427,6 +427,19 @@ export async function broadcastNotification(params: {
   });
 }
 
+export async function getBroadcastHistory() {
+  return apiFetch<Array<{
+    id: string;
+    title: string;
+    content: string;
+    type: 'SYSTEM' | 'REWARD' | 'NETWORK';
+    sent_count: number;
+    created_at: string;
+  }>>('/admin/notifications/broadcast/history', {
+    method: 'GET',
+  });
+}
+
 // 8. SystemConfig - 系统配置
 export async function getSystemConfig() {
   return apiFetch<{

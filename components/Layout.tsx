@@ -17,7 +17,8 @@ import {
   BarChart3,
   WalletMinimal,
   Percent,
-  Network
+  Network,
+  Megaphone
 } from 'lucide-react';
 import { getAdminKey } from '../lib/api';
 
@@ -46,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: '操作记录', icon: ClipboardList, path: '/records' },
     { name: '用户管理', icon: Users, path: '/users' },
     { name: '团队关系', icon: Network, path: '/team' },
+    { name: '广播通知', icon: Megaphone, path: '/broadcast' },
     { name: '系统设置', icon: Settings, path: '/system' },
   ];
 
