@@ -18,7 +18,7 @@ const Dashboard: React.FC = () => {
       
       // 转换后端数据格式为前端格式
       const totalRAT = data.totalHoldings ? parseFloat(data.totalHoldings.amount) : 0;
-      const airdropFeesBNB = parseFloat(data.airdropFeeBalance || '0');
+      const airdropFeesBNB = parseFloat(data.airdropFeeBalance || '0'); // ✅ 修复：现在显示的是累计总收益
       
       // 暂时移除趋势数据（需要历史数据支持，后续可以实现）
       const mockData: KPIResponse = {
