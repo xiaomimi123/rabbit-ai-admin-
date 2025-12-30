@@ -9,6 +9,7 @@ import RevenuePage from './pages/Revenue';
 import WithdrawalExpenses from './pages/WithdrawalExpenses';
 import YieldStrategy from './pages/YieldStrategy';
 import UsersPage from './pages/Users';
+import TeamHierarchy from './pages/TeamHierarchy';
 import SystemConfigPage from './pages/SystemConfig';
 import { setAdminKey, getAdminKey, getAdminKPIs } from './lib/api';
 import { Rabbit, Key, AlertCircle } from 'lucide-react';
@@ -139,6 +140,7 @@ const App: React.FC = () => {
           <Route path="/finance" element={<FinanceOps />} />
           <Route path="/records" element={<OperationRecords />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/team" element={<TeamHierarchy />} />
           <Route path="/system" element={<SystemConfigPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

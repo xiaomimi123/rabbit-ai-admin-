@@ -379,6 +379,31 @@ export async function adjustUserAsset(params: {
   });
 }
 
+// 获取用户团队关系（上级、下级）
+export async function getUserTeam(address: string) {
+  return apiFetch<{
+    ok: boolean;
+    target: {
+      address: string;
+      energyTotal: string;
+      inviteCount: string;
+      registeredAt: string;
+    };
+    upline: {
+      address: string;
+      energyTotal: string;
+      inviteCount: string;
+      registeredAt: string;
+    } | null;
+    downline: Array<{
+      address: string;
+      energyTotal: string;
+      inviteCount: string;
+      registeredAt: string;
+    }>;
+  }>(`/admin/users/${encodeURIComponent(address)}/team`);
+}
+
 export async function sendUserNotification(params: {
   address: string;
   title: string;
