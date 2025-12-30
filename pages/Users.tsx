@@ -289,6 +289,11 @@ const UsersPage: React.FC = () => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
+  const copyAddress = (address: string) => {
+    navigator.clipboard.writeText(address);
+    showNotification('success', '地址已复制到剪贴板');
+  };
+
   return (
     <div className="space-y-6 relative overflow-hidden h-full flex flex-col">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
@@ -341,6 +346,13 @@ const UsersPage: React.FC = () => {
                         {user.address.substring(2, 4).toUpperCase()}
                       </div>
                       <p className="text-xs font-mono font-bold text-zinc-200">{truncateAddress(user.address)}</p>
+                      <button
+                        onClick={() => copyAddress(user.address)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-800 rounded transition-all"
+                        title="复制地址"
+                      >
+                        <Copy size={14} className="text-zinc-500 hover:text-emerald-400" />
+                      </button>
                     </div>
                   </td>
                   <td className="px-6 py-4">
