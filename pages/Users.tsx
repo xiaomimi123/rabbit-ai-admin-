@@ -25,7 +25,7 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
-import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getRatBalance } from '../lib/api';
+import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getRatBalance, getUserEarnings } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 
@@ -153,20 +153,27 @@ const UsersPage: React.FC = () => {
     if (!selectedUser) return;
     setDetailsLoading(true);
     try {
-      const data = await getAdminUser(selectedUser.address);
+      // 🟢 修复：同时获取用户基本信息和实时收益（与前端使用相同的计算逻辑）
+      const [data, earningsData] = await Promise.all([
+        getAdminUser(selectedUser.address),
+        getUserEarnings(selectedUser.address).catch(() => null) // 如果失败，返回 null
+      ]);
+      
       if (data.user) {
         // 使用函数式更新，避免依赖 selectedUser 对象本身
         setSelectedUser((prev) => {
           if (!prev) return prev;
-          const usdtTotal = parseFloat(data.user.usdtTotal || '0');
-          const usdtLocked = parseFloat(data.user.usdtLocked || '0');
-          const usdtBalance = usdtTotal - usdtLocked; // 可提现余额 = 总额 - 锁定
+          // 🟢 修复：使用实时计算的收益（与前端一致），如果获取失败则回退到数据库值
+          const usdtBalance = earningsData 
+            ? parseFloat(earningsData.pendingUsdt || '0') 
+            : parseFloat(data.user.usdtTotal || '0') - parseFloat(data.user.usdtLocked || '0');
+          
           return {
             ...prev,
             energyTotal: parseFloat(data.user.energyTotal),
             energyLocked: parseFloat(data.user.energyLocked),
             inviteCount: parseInt(data.user.inviteCount),
-            usdtBalance: usdtBalance, // 更新可提现 USDT 余额
+            usdtBalance: usdtBalance, // 更新可提现 USDT 余额（实时计算）
           };
         });
       }
@@ -386,7 +393,7 @@ const UsersPage: React.FC = () => {
                 </div>
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">可提现 USDT</p>
-                  <p className="text-3xl font-black text-blue-400">${selectedUser.usdtBalance}</p>
+                  <p className="text-3xl font-black text-blue-400">${selectedUser.usdtBalance.toFixed(6)}</p>
                 </div>
               </div>
 
