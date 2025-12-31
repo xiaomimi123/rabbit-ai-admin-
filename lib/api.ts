@@ -324,18 +324,16 @@ export async function getRatBalance(address: string) {
   }>(`/asset/rat-balance?address=${encodeURIComponent(address)}`);
 }
 
-// 获取用户实时收益（与前端使用相同的 API）
+// 获取用户实时收益（使用管理 API，需要 admin key 认证）
 export async function getUserEarnings(address: string) {
-  // 这个 API 是用户 API，不需要 admin key
-  const response = await fetch(`${BASE_URL}/asset/earnings?address=${address}`);
-  if (!response.ok) {
-    if (response.status === 404) {
-      return { pendingUsdt: '0', dailyRate: 0, currentTier: 0, holdingDays: 0 };
-    }
-    throw new Error(`Failed to fetch earnings: ${response.statusText}`);
-  }
-  const data = await response.json();
-  return data; // { pendingUsdt: string, dailyRate: number, currentTier: number, holdingDays: number }
+  // 🟢 修复：使用管理 API，需要 admin key 认证，更安全
+  return apiFetch<{
+    ok: boolean;
+    pendingUsdt: string;
+    dailyRate: number;
+    currentTier: number;
+    holdingDays: number;
+  }>(`/admin/users/${encodeURIComponent(address)}/earnings`);
 }
 
 export async function getAdminUser(address: string) {

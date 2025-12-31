@@ -164,7 +164,8 @@ const UsersPage: React.FC = () => {
         setSelectedUser((prev) => {
           if (!prev) return prev;
           // 🟢 修复：使用实时计算的收益（与前端一致），如果获取失败则回退到数据库值
-          const usdtBalance = earningsData 
+          // earningsData 格式：{ ok: true, pendingUsdt: string, ... }
+          const usdtBalance = earningsData && earningsData.ok
             ? parseFloat(earningsData.pendingUsdt || '0') 
             : parseFloat(data.user.usdtTotal || '0') - parseFloat(data.user.usdtLocked || '0');
           
