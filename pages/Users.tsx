@@ -107,10 +107,13 @@ const UsersPage: React.FC = () => {
         ratLocked: 0, // RAT 锁定余额暂时设为 0，后续可以从数据库获取
       }));
       
+      // 🟢 优化：先显示用户列表，不等待 RAT 余额加载
       setUsers(usersList);
+      setLoading(false); // 立即关闭 loading，让用户看到列表
       
       // 异步获取每个用户的 RAT 余额（从链上读取）
       // 使用 Promise.allSettled 避免单个失败影响整体
+      // 注意：这里不阻塞 loading 状态，让用户先看到列表
       const ratBalancePromises = usersList.map(async (user) => {
         try {
           const ratData = await getRatBalance(user.address);
@@ -127,24 +130,24 @@ const UsersPage: React.FC = () => {
         }
       });
       
-      const ratBalances = await Promise.allSettled(ratBalancePromises);
-      
-      // 更新用户列表中的 RAT 余额
-      setUsers((prevUsers) =>
-        prevUsers.map((user) => {
-          const index = usersList.findIndex((u) => u.address === user.address);
-          if (index >= 0 && index < ratBalances.length) {
-            const result = ratBalances[index];
-            if (result.status === 'fulfilled') {
-              return { ...user, ratBalance: result.value.balance };
+      // 后台异步更新 RAT 余额，不阻塞 UI
+      Promise.allSettled(ratBalancePromises).then((ratBalances) => {
+        // 更新用户列表中的 RAT 余额
+        setUsers((prevUsers) =>
+          prevUsers.map((user) => {
+            const index = usersList.findIndex((u) => u.address === user.address);
+            if (index >= 0 && index < ratBalances.length) {
+              const result = ratBalances[index];
+              if (result.status === 'fulfilled') {
+                return { ...user, ratBalance: result.value.balance };
+              }
             }
-          }
-          return { ...user, ratBalance: user.ratBalance ?? 0 };
-        })
-      );
+            return { ...user, ratBalance: user.ratBalance ?? 0 };
+          })
+        );
+      });
     } catch (e) {
       console.error(e);
-    } finally {
       setLoading(false);
     }
   };

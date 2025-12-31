@@ -52,6 +52,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
   const response = await fetch(url, {
     ...options,
     headers,
+    signal: options.signal, // 支持 AbortController
   });
 
   if (!response.ok) {
@@ -319,9 +320,27 @@ export async function getAdminUserList(params: {
 
 // 获取用户 RAT 余额（从链上读取）
 export async function getRatBalance(address: string) {
-  return apiFetch<{
-    balance: string;
-  }>(`/asset/rat-balance?address=${encodeURIComponent(address)}`);
+  // 🟢 添加前端超时保护（15秒），防止请求无限等待
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  
+  try {
+    const result = await apiFetch<{
+      balance: string;
+    }>(`/asset/rat-balance?address=${encodeURIComponent(address)}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      console.warn(`[API] RAT balance request timeout for ${address}`);
+      // 返回默认值，不抛出错误
+      return { balance: '0.00' };
+    }
+    throw error;
+  }
 }
 
 // 获取用户实时收益（使用管理 API，需要 admin key 认证）
