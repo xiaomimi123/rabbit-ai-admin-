@@ -16,13 +16,20 @@ const Dashboard: React.FC = () => {
         getTopRATHolders(5).catch(() => ({ ok: true, items: [] })), // 如果失败，返回空数组
       ]);
       
+      console.log('[Dashboard] KPI 数据:', data); // 🟢 调试日志
+      
       // 转换后端数据格式为前端格式
       const totalRAT = data.totalHoldings ? parseFloat(data.totalHoldings.amount) : 0;
       const airdropFeesBNB = parseFloat(data.airdropFeeBalance || '0'); // ✅ 修复：现在显示的是累计总收益
       
+      // 🟢 修复：确保 usersTotal 正确解析
+      const usersTotal = typeof data.usersTotal === 'number' ? data.usersTotal : (typeof data.usersTotal === 'string' ? parseInt(data.usersTotal, 10) : 0);
+      
+      console.log('[Dashboard] 解析后的 usersTotal:', usersTotal); // 🟢 调试日志
+      
       // 暂时移除趋势数据（需要历史数据支持，后续可以实现）
       const mockData: KPIResponse = {
-        totalUsers: data.usersTotal || 0,
+        totalUsers: usersTotal || 0,
         pendingWithdrawals: Math.ceil(parseFloat(data.pendingWithdrawTotal || '0') / 50), // 估算待处理数量
         airdropFeesBNB: airdropFeesBNB,
         totalRATCirculating: totalRAT,
@@ -33,10 +40,21 @@ const Dashboard: React.FC = () => {
           rat: 0
         }
       };
+      
+      console.log('[Dashboard] 最终 KPI 数据:', mockData); // 🟢 调试日志
+      
       setKpis(mockData);
       setTopHolders(holders.items || []);
     } catch (error) {
       console.error('获取 KPI 失败', error);
+      // 🟢 修复：即使失败也设置默认值，避免页面显示空白
+      setKpis({
+        totalUsers: 0,
+        pendingWithdrawals: 0,
+        airdropFeesBNB: 0,
+        totalRATCirculating: 0,
+        trends: { users: 0, withdrawals: 0, fees: 0, rat: 0 }
+      });
     } finally {
       setLoading(false);
     }
@@ -59,21 +77,21 @@ const Dashboard: React.FC = () => {
   const cards = [
     { 
       label: '总用户数', 
-      value: kpis?.totalUsers.toLocaleString(), 
+      value: kpis?.totalUsers != null ? kpis.totalUsers.toLocaleString() : '0', 
       trend: kpis?.trends.users, 
       icon: Users, 
       color: 'blue' 
     },
     { 
       label: '待处理提现', 
-      value: kpis?.pendingWithdrawals, 
+      value: kpis?.pendingWithdrawals != null ? String(kpis.pendingWithdrawals) : '0', 
       trend: kpis?.trends.withdrawals, 
       icon: AlertCircle, 
       color: kpis?.pendingWithdrawals && kpis.pendingWithdrawals > 10 ? 'red' : 'zinc' 
     },
     { 
       label: '空投手续费 (BNB)', 
-      value: kpis?.airdropFeesBNB.toFixed(2), 
+      value: kpis?.airdropFeesBNB != null ? kpis.airdropFeesBNB.toFixed(2) : '0.00', 
       trend: kpis?.trends.fees, 
       icon: Coins, 
       color: 'emerald' 
