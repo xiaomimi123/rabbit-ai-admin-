@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, AlertCircle, Coins, Gem, TrendingUp, TrendingDown, PieChart } from 'lucide-react';
-import { getAdminKPIs, getTopRATHolders } from '../lib/api';
+import { getAdminKPIs, getTopRATHolders, getAdminUserList } from '../lib/api';
 import { KPIResponse } from '../types';
 
 const Dashboard: React.FC = () => {
@@ -10,6 +10,8 @@ const Dashboard: React.FC = () => {
   const [topHolders, setTopHolders] = useState<Array<{ rank: number; address: string; balance: number }>>([]);
 
   const fetchKPIs = useCallback(async () => {
+    let usersTotal = 0;
+    
     try {
       const [data, holders] = await Promise.all([
         getAdminKPIs(),
@@ -23,7 +25,7 @@ const Dashboard: React.FC = () => {
       const airdropFeesBNB = parseFloat(data.airdropFeeBalance || '0'); // ✅ 修复：现在显示的是累计总收益
       
       // 🟢 修复：确保 usersTotal 正确解析
-      const usersTotal = typeof data.usersTotal === 'number' ? data.usersTotal : (typeof data.usersTotal === 'string' ? parseInt(data.usersTotal, 10) : 0);
+      usersTotal = typeof data.usersTotal === 'number' ? data.usersTotal : (typeof data.usersTotal === 'string' ? parseInt(data.usersTotal, 10) : 0);
       
       console.log('[Dashboard] 解析后的 usersTotal:', usersTotal); // 🟢 调试日志
       
@@ -47,9 +49,22 @@ const Dashboard: React.FC = () => {
       setTopHolders(holders.items || []);
     } catch (error) {
       console.error('获取 KPI 失败', error);
+      
+      // 🟢 修复：如果 KPI API 失败，尝试从用户列表 API 获取用户总数
+      if (usersTotal === 0) {
+        try {
+          console.log('[Dashboard] 尝试从用户列表 API 获取用户总数...');
+          const userListData = await getAdminUserList({ limit: 1, offset: 0 });
+          usersTotal = userListData.total || 0;
+          console.log('[Dashboard] 从用户列表获取到的用户总数:', usersTotal);
+        } catch (userListError) {
+          console.error('[Dashboard] 从用户列表获取用户总数也失败:', userListError);
+        }
+      }
+      
       // 🟢 修复：即使失败也设置默认值，避免页面显示空白
       setKpis({
-        totalUsers: 0,
+        totalUsers: usersTotal,
         pendingWithdrawals: 0,
         airdropFeesBNB: 0,
         totalRATCirculating: 0,
