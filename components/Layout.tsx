@@ -19,7 +19,8 @@ import {
   Percent,
   Network,
   Megaphone,
-  FileCode
+  FileCode,
+  BarChart
 } from 'lucide-react';
 import { getAdminKey } from '../lib/api';
 
@@ -49,6 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: '用户管理', icon: Users, path: '/users' },
     { name: '团队关系', icon: Network, path: '/team' },
     { name: '广播通知', icon: Megaphone, path: '/broadcast' },
+    { name: '访问统计', icon: BarChart, path: '/analytics' },
     { name: '智能合约设置', icon: FileCode, path: '/contract' },
     { name: '系统设置', icon: Settings, path: '/system' },
   ];

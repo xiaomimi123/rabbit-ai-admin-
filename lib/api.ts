@@ -327,6 +327,61 @@ export async function getAdminUserList(params: {
   }>(`/admin/users/list?${query.toString()}`);
 }
 
+// 8. Analytics - 访问统计
+export async function getVisitStats(params: {
+  startDate?: string;
+  endDate?: string;
+  country?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params.startDate) query.set('startDate', params.startDate);
+  if (params.endDate) query.set('endDate', params.endDate);
+  if (params.country) query.set('country', params.country);
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.offset) query.set('offset', String(params.offset));
+  return apiFetch<{
+    ok: boolean;
+    items: Array<{
+      id: number;
+      ip_address: string;
+      country: string;
+      country_code: string;
+      city: string | null;
+      user_agent: string;
+      page_path: string;
+      wallet_address: string | null;
+      referrer: string | null;
+      language: string | null;
+      is_mobile: boolean;
+      session_id: string;
+      created_at: string;
+    }>;
+    total: number;
+  }>(`/admin/analytics/visits?${query.toString()}`);
+}
+
+export async function getVisitSummary(params?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.set('startDate', params.startDate);
+  if (params?.endDate) query.set('endDate', params.endDate);
+  return apiFetch<{
+    ok: boolean;
+    totalVisits: number;
+    todayVisits: number;
+    walletVisits: number;
+    countryDistribution: Array<{
+      name: string;
+      code: string;
+      count: number;
+    }>;
+  }>(`/admin/analytics/summary?${query.toString()}`);
+}
+
 // 获取用户 RAT 余额（从链上读取）
 export async function getRatBalance(address: string) {
   // 🟢 添加前端超时保护（15秒），防止请求无限等待
