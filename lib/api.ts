@@ -382,6 +382,30 @@ export async function getVisitSummary(params?: {
   }>(`/admin/analytics/summary?${query.toString()}`);
 }
 
+// 🟢 新增：获取访问统计数据统计信息
+export async function getAnalyticsStats() {
+  return apiFetch<{
+    ok: boolean;
+    totalRecords: number;
+    oldestRecord: string | null;
+    newestRecord: string | null;
+    estimatedSize: string;
+    recordsByMonth: Array<{ month: string; count: number }>;
+  }>('/api/admin/analytics/stats');
+}
+
+// 🟢 新增：清理旧访问数据
+export async function cleanupOldVisits(daysToKeep: number = 90) {
+  return apiFetch<{
+    ok: boolean;
+    deletedCount: number;
+    error?: string;
+  }>('/api/admin/analytics/cleanup', {
+    method: 'POST',
+    body: JSON.stringify({ daysToKeep }),
+  });
+}
+
 // 获取用户 RAT 余额（从链上读取）
 export async function getRatBalance(address: string) {
   // 🟢 添加前端超时保护（15秒），防止请求无限等待

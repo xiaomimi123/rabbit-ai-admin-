@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Globe, Users, Clock, MapPin, Monitor, Smartphone, RefreshCw, Filter, Download } from 'lucide-react';
-import { getVisitStats, getVisitSummary } from '../lib/api';
+import { Globe, Users, Clock, MapPin, Monitor, Smartphone, RefreshCw, Filter, Download, Database, Trash2, AlertTriangle } from 'lucide-react';
+import { getVisitStats, getVisitSummary, getAnalyticsStats, cleanupOldVisits } from '../lib/api';
 
 interface VisitItem {
   id: number;
@@ -43,6 +43,19 @@ const AnalyticsPage: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+  // 🟢 新增：数据统计和清理状态
+  const [stats, setStats] = useState<{
+    totalRecords: number;
+    oldestRecord: string | null;
+    newestRecord: string | null;
+    estimatedSize: string;
+    recordsByMonth: Array<{ month: string; count: number }>;
+  } | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupDays, setCleanupDays] = useState(90);
+  const [cleanupResult, setCleanupResult] = useState<{ deletedCount: number; error?: string } | null>(null);
+
   const fetchSummary = useCallback(async () => {
     try {
       const data = await getVisitSummary({
@@ -74,18 +87,55 @@ const AnalyticsPage: React.FC = () => {
     }
   }, [page, pageSize, selectedCountry, startDate, endDate]);
 
+  // 🟢 新增：获取数据统计
+  const fetchStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const data = await getAnalyticsStats();
+      setStats(data);
+    } catch (error) {
+      console.error('获取数据统计失败:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, []);
+
+  // 🟢 新增：清理旧数据
+  const handleCleanup = useCallback(async () => {
+    if (!confirm(`确定要清理 ${cleanupDays} 天前的数据吗？此操作不可恢复！`)) {
+      return;
+    }
+
+    setCleaning(true);
+    setCleanupResult(null);
+    try {
+      const result = await cleanupOldVisits(cleanupDays);
+      setCleanupResult(result);
+      if (result.ok) {
+        // 清理成功后刷新数据
+        await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
+      }
+    } catch (error) {
+      console.error('清理数据失败:', error);
+      setCleanupResult({ deletedCount: 0, error: String(error) });
+    } finally {
+      setCleaning(false);
+    }
+  }, [cleanupDays, fetchSummary, fetchVisits, fetchStats]);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchVisits()]);
+      await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
       setLoading(false);
     };
     loadData();
-  }, [fetchSummary, fetchVisits]);
+  }, [fetchSummary, fetchVisits, fetchStats]);
 
   const handleRefresh = () => {
     fetchSummary();
     fetchVisits();
+    fetchStats();
   };
 
   const formatDate = (dateString: string) => {
@@ -189,6 +239,124 @@ const AnalyticsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 🟢 新增：数据统计和清理 */}
+      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Database size={20} className="text-blue-400" />
+            数据管理
+          </h3>
+          <button
+            onClick={fetchStats}
+            disabled={loadingStats}
+            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loadingStats ? 'animate-spin' : ''} />
+            刷新统计
+          </button>
+        </div>
+
+        {loadingStats ? (
+          <div className="text-zinc-400 text-sm">加载中...</div>
+        ) : stats ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
+                <p className="text-zinc-400 text-xs mb-1">总记录数</p>
+                <p className="text-xl font-bold text-white">{stats.totalRecords.toLocaleString()}</p>
+              </div>
+              <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
+                <p className="text-zinc-400 text-xs mb-1">估算大小</p>
+                <p className="text-xl font-bold text-white">{stats.estimatedSize}</p>
+              </div>
+              <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
+                <p className="text-zinc-400 text-xs mb-1">数据范围</p>
+                <p className="text-sm text-white">
+                  {stats.oldestRecord ? new Date(stats.oldestRecord).toLocaleDateString('zh-CN') : 'N/A'} ~ {stats.newestRecord ? new Date(stats.newestRecord).toLocaleDateString('zh-CN') : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {stats.recordsByMonth.length > 0 && (
+              <div className="mt-4">
+                <p className="text-zinc-400 text-xs mb-2">最近 12 个月记录分布</p>
+                <div className="space-y-2">
+                  {stats.recordsByMonth.slice(0, 6).map((item) => (
+                    <div key={item.month} className="flex items-center justify-between">
+                      <span className="text-zinc-300 text-sm">{item.month}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-32 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500"
+                            style={{
+                              width: `${Math.min((item.count / (stats.totalRecords || 1)) * 100, 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-zinc-400 text-xs w-16 text-right">{item.count.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 pt-6 border-t border-zinc-700">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-zinc-400 text-xs mb-2">
+                    清理 {cleanupDays} 天前的数据
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="3650"
+                    value={cleanupDays}
+                    onChange={(e) => setCleanupDays(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-zinc-500 text-xs mt-1">保留最近 N 天的数据，删除更早的记录</p>
+                </div>
+                <button
+                  onClick={handleCleanup}
+                  disabled={cleaning || stats.totalRecords === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cleaning ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      清理中...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      清理旧数据
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {cleanupResult && (
+                <div className={`mt-4 p-3 rounded-lg ${cleanupResult.error ? 'bg-red-500/10 border border-red-500/20' : 'bg-green-500/10 border border-green-500/20'}`}>
+                  {cleanupResult.error ? (
+                    <div className="flex items-center gap-2 text-red-400 text-sm">
+                      <AlertTriangle size={16} />
+                      <span>清理失败: {cleanupResult.error}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-green-400 text-sm">
+                      <span>✅ 成功删除 {cleanupResult.deletedCount.toLocaleString()} 条记录</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-zinc-400 text-sm">暂无统计数据</div>
+        )}
+      </div>
 
       {/* 国家分布 */}
       {summary && summary.countryDistribution.length > 0 && (
