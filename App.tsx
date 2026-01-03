@@ -12,7 +12,7 @@ import UsersPage from './pages/Users';
 import TeamHierarchy from './pages/TeamHierarchy';
 import SystemConfigPage from './pages/SystemConfig';
 import BroadcastHistoryPage from './pages/BroadcastHistory';
-import { setAdminKey, getAdminKey, getAdminKPIs } from './lib/api';
+import { setAdminKey, getAdminKey, verifyAdminKey } from './lib/api';
 import { Rabbit, Key, AlertCircle } from 'lucide-react';
 
 const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
@@ -36,8 +36,9 @@ const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
       // 临时设置 key 用于验证
       setAdminKey(key);
       
-      // 调用 API 验证 key 是否有效
-      await getAdminKPIs();
+      // 🟢 修复：使用简单的认证接口验证密钥，不调用 RPC
+      // 这样可以避免在登录时触发网络错误
+      await verifyAdminKey();
       
       // 验证成功，保存 key 并进入系统
       onLogin();
@@ -48,7 +49,9 @@ const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
       if (errorMsg.includes('401') || errorMsg.includes('UNAUTHORIZED') || errorMsg.includes('Invalid admin')) {
         setError('管理员密钥无效，请检查后重试');
       } else if (errorMsg.includes('404')) {
-        setError('无法连接到后端服务，请检查网络连接');
+        setError('无法连接到后端服务，请检查网络连接和 API 地址配置');
+      } else if (errorMsg.includes('NETWORK_ERROR') || errorMsg.includes('could not detect network')) {
+        setError('无法连接到后端服务，请检查网络连接和 API 地址配置');
       } else {
         setError(`验证失败: ${errorMsg}`);
       }

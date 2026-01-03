@@ -79,6 +79,15 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
 
 // ==================== 管理后台 API 函数 ====================
 
+// 0. Auth - 认证验证（只验证密钥，不调用 RPC）
+export async function verifyAdminKey() {
+  return apiFetch<{
+    ok: boolean;
+    message: string;
+    timestamp: string;
+  }>('/admin/auth/verify');
+}
+
 // 1. Dashboard - KPI数据
 export async function getAdminKPIs() {
   return apiFetch<{
