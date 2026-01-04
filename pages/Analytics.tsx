@@ -41,6 +41,7 @@ const AnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [loadingVisits, setLoadingVisits] = useState(false);
+  const [isInitialLoadVisits, setIsInitialLoadVisits] = useState(true); // 🟢 新增：访问记录初始加载标记
   
   // 筛选条件
   const [selectedCountry, setSelectedCountry] = useState<string>('');
@@ -73,8 +74,11 @@ const AnalyticsPage: React.FC = () => {
     }
   }, [startDate, endDate, showNotification]);
 
-  const fetchVisits = useCallback(async () => {
-    setLoadingVisits(true);
+  const fetchVisits = useCallback(async (isRefresh = false) => {
+    // 🟢 修复：只在初始加载时显示骨架屏，刷新时不显示
+    if (!isRefresh) {
+      setLoadingVisits(true);
+    }
     try {
       const data = await getVisitStats({
         startDate: startDate || undefined,
@@ -90,6 +94,7 @@ const AnalyticsPage: React.FC = () => {
       showNotification('error', `获取访问记录失败: ${error?.message || '未知错误'}`);
     } finally {
       setLoadingVisits(false);
+      setIsInitialLoadVisits(false); // 🟢 标记初始加载完成
     }
   }, [pagination, selectedCountry, startDate, endDate, showNotification]);
 
@@ -161,10 +166,20 @@ const AnalyticsPage: React.FC = () => {
     handleRefresh(false); // 初始加载
   }, []); // 只在组件挂载时加载一次
 
-  // 当筛选条件或分页变化时，重新加载访问记录
+  // 🟢 修复：当筛选条件或分页变化时，重新加载访问记录
   useEffect(() => {
-    fetchVisits();
-  }, [pagination.page, selectedCountry, startDate, endDate, fetchVisits]);
+    // 筛选条件变化时，重置为初始加载状态
+    setIsInitialLoadVisits(true);
+    fetchVisits(false); // 筛选条件变化时，显示骨架屏
+  }, [selectedCountry, startDate, endDate]); // 🟢 移除 pagination.page 依赖，避免重复触发
+
+  // 🟢 新增：分页变化时，不显示骨架屏（只刷新数据）
+  useEffect(() => {
+    if (!isInitialLoadVisits) {
+      // 只有在非初始加载状态下，分页变化才不显示骨架屏
+      fetchVisits(true);
+    }
+  }, [pagination.page]); // 🟢 只在分页变化时触发
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -477,7 +492,7 @@ const AnalyticsPage: React.FC = () => {
           <p className="text-sm text-zinc-400">共 {pagination.total.toLocaleString()} 条记录</p>
         </div>
         
-        {loadingVisits ? (
+        {loadingVisits && isInitialLoadVisits ? (
           <div className="p-8">
             <TableSkeleton rows={5} cols={7} />
           </div>
