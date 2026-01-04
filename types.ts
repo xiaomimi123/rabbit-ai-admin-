@@ -21,6 +21,9 @@ export interface User {
   registeredAt: string;
   lastActive: string;
   usdtBalance: number;
+  ratBalance?: number; // 🟢 新增：RAT 余额（格式化后的值）
+  ratBalanceWei?: string; // 🟢 新增：Wei 值（用于精确计算）
+  ratBalanceUpdatedAt?: string; // 🟢 新增：更新时间
 }
 
 export interface Withdrawal {

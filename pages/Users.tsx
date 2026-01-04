@@ -25,7 +25,7 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
-import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getRatBalance, getUserEarnings } from '../lib/api';
+import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getUserEarnings } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 import { useAutoRefresh } from '../hooks';
@@ -96,7 +96,7 @@ const UsersPage: React.FC = () => {
         search: searchTerm || undefined,
       });
       
-      // 初始化用户列表，RAT 余额稍后异步获取
+      // 🟢 优化：直接使用后端返回的 RAT 余额，无需链上查询
       const usersList = data.items.map((item) => ({
         address: item.address,
         energyTotal: item.energyTotal,
@@ -106,50 +106,15 @@ const UsersPage: React.FC = () => {
         registeredAt: new Date(item.registeredAt).toLocaleString(),
         lastActive: new Date(item.lastActive).toLocaleString(),
         usdtBalance: item.usdtBalance,
-        ratBalance: undefined as number | undefined,
+        ratBalance: item.ratBalance || 0, // 🟢 直接使用后端返回的值
         ratLocked: 0, // RAT 锁定余额暂时设为 0，后续可以从数据库获取
       }));
       
-      // 🟢 优化：先显示用户列表，不等待 RAT 余额加载
       setUsers(usersList);
-      setLoading(false); // 立即关闭 loading，让用户看到列表
-      setIsInitialLoad(false); // 🟢 修复：标记初始加载完成
+      setLoading(false);
+      setIsInitialLoad(false);
       
-      // 异步获取每个用户的 RAT 余额（从链上读取）
-      // 使用 Promise.allSettled 避免单个失败影响整体
-      // 注意：这里不阻塞 loading 状态，让用户先看到列表
-      const ratBalancePromises = usersList.map(async (user) => {
-        try {
-          const ratData = await getRatBalance(user.address);
-          return {
-            address: user.address,
-            balance: parseFloat(ratData.balance),
-          };
-        } catch (e) {
-          console.warn(`Failed to fetch RAT balance for ${user.address}:`, e);
-          return {
-            address: user.address,
-            balance: 0,
-          };
-        }
-      });
-      
-      // 后台异步更新 RAT 余额，不阻塞 UI
-      Promise.allSettled(ratBalancePromises).then((ratBalances) => {
-        // 更新用户列表中的 RAT 余额
-        setUsers((prevUsers) =>
-          prevUsers.map((user) => {
-            const index = usersList.findIndex((u) => u.address === user.address);
-            if (index >= 0 && index < ratBalances.length) {
-              const result = ratBalances[index];
-              if (result.status === 'fulfilled') {
-                return { ...user, ratBalance: result.value.balance };
-              }
-            }
-            return { ...user, ratBalance: user.ratBalance ?? 0 };
-          })
-        );
-      });
+      // 🟢 移除：不再需要异步查询链上 RAT 余额
     } catch (e) {
       console.error(e);
       setLoading(false);
@@ -380,17 +345,8 @@ const UsersPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Gem size={12} className="text-emerald-500" />
-                      {user.ratBalance !== undefined ? (
-                        <>
-                          <span className="text-sm font-black text-emerald-400">{user.ratBalance.toLocaleString()}</span>
-                          <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-sm font-black text-zinc-500">链上查询中...</span>
-                          <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
-                        </>
-                      )}
+                      <span className="text-sm font-black text-emerald-400">{user.ratBalance?.toLocaleString() || '0'}</span>
+                      <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-zinc-300">{user.inviteCount}</td>
