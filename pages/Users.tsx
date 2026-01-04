@@ -41,6 +41,7 @@ interface UserWithRatBalance extends User {
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<UserWithRatBalance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserWithRatBalance | null>(null);
   const [activeTab, setActiveTab] = useState<'withdrawals' | 'energy' | 'airdrops' | 'messages'>('energy');
@@ -65,10 +66,6 @@ const UsersPage: React.FC = () => {
   // 通知系统
   const { notifications, showNotification, removeNotification } = useNotifications();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   // 使用 useRef 跟踪上次加载的地址和标签，避免重复调用
   const lastFetchedAddressRef = useRef<string | null>(null);
   const lastFetchedTabRef = useRef<string | null>(null);
@@ -87,8 +84,11 @@ const UsersPage: React.FC = () => {
     }
   }, [selectedUser?.address, activeTab]); // 只依赖 address 而不是整个对象
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const fetchUsers = async (isRefresh = false) => {
+    // 🟢 修复：只在初始加载时显示骨架屏，刷新时不显示
+    if (!isRefresh) {
+      setLoading(true);
+    }
     try {
       const data = await getAdminUserList({
         limit: 100,
@@ -113,6 +113,7 @@ const UsersPage: React.FC = () => {
       // 🟢 优化：先显示用户列表，不等待 RAT 余额加载
       setUsers(usersList);
       setLoading(false); // 立即关闭 loading，让用户看到列表
+      setIsInitialLoad(false); // 🟢 修复：标记初始加载完成
       
       // 异步获取每个用户的 RAT 余额（从链上读取）
       // 使用 Promise.allSettled 避免单个失败影响整体
@@ -249,7 +250,7 @@ const UsersPage: React.FC = () => {
       });
       showNotification('success', `${asset} 资产已${action === 'add' ? '增加' : '扣除'}: ${adjustAmount}`);
       setAdjustAmount('');
-      fetchUsers();
+      fetchUsers(true); // 🟢 修复：资产调整后刷新，不显示骨架屏
       if (selectedUser) {
         fetchUserDetails();
       }
@@ -287,7 +288,8 @@ const UsersPage: React.FC = () => {
   // 当搜索词变化时，重新获取用户列表
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchUsers();
+      setIsInitialLoad(true); // 🟢 修复：搜索时重新标记为初始加载
+      fetchUsers(false);
     }, 500); // 防抖
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -300,8 +302,13 @@ const UsersPage: React.FC = () => {
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
     interval: 30000, // 30秒刷新一次
-    onRefresh: fetchUsers,
+    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
+    onRefresh: () => fetchUsers(true), // 🟢 修复：传递 isRefresh=true，不显示骨架屏
   });
+
+  useEffect(() => {
+    fetchUsers(false); // 🟢 修复：初始加载
+  }, []);
 
   const truncateAddress = (addr: string | null) => {
     if (!addr) return '无';
@@ -349,7 +356,7 @@ const UsersPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {loading ? (
+              {loading && isInitialLoad ? (
                 <tr><td colSpan={4} className="px-6 py-20"><TableSkeleton rows={5} cols={4} /></td></tr>
               ) : paginatedData.length === 0 ? (
                 <tr><td colSpan={4} className="px-6 py-20"><EmptyState variant="database" title="暂无用户" description="当前搜索条件下没有找到用户" /></td></tr>

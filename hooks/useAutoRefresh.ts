@@ -4,6 +4,7 @@ interface UseAutoRefreshOptions {
   enabled?: boolean;
   interval?: number; // 毫秒
   onRefresh: () => void | Promise<void>;
+  immediate?: boolean; // 🟢 新增：是否立即执行一次（默认 false）
 }
 
 interface UseAutoRefreshReturn {
@@ -27,7 +28,7 @@ interface UseAutoRefreshReturn {
  * ```
  */
 export function useAutoRefresh(options: UseAutoRefreshOptions): UseAutoRefreshReturn {
-  const { enabled = true, interval = 30000, onRefresh } = options;
+  const { enabled = true, interval = 30000, onRefresh, immediate = false } = options;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -53,8 +54,10 @@ export function useAutoRefresh(options: UseAutoRefreshOptions): UseAutoRefreshRe
       return;
     }
 
-    // 立即执行一次
-    refresh();
+    // 🟢 修复：只在 immediate=true 时立即执行一次
+    if (immediate) {
+      refresh();
+    }
 
     // 设置定时刷新
     intervalRef.current = setInterval(refresh, interval);
@@ -65,7 +68,7 @@ export function useAutoRefresh(options: UseAutoRefreshOptions): UseAutoRefreshRe
         intervalRef.current = null;
       }
     };
-  }, [enabled, interval, refresh]);
+  }, [enabled, interval, immediate, refresh]);
 
   return { refresh, isRefreshing };
 }

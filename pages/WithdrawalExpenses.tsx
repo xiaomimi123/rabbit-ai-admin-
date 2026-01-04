@@ -21,6 +21,7 @@ import { paginateData } from '../utils/pagination';
 const WithdrawalExpenses: React.FC = () => {
   const [records, setRecords] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState('7d');
   const { notifications, showNotification, removeNotification } = useNotifications();
@@ -29,8 +30,11 @@ const WithdrawalExpenses: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  const fetchExpenses = async () => {
-    setLoading(true);
+  const fetchExpenses = async (isRefresh = false) => {
+    // 🟢 修复：只在初始加载时显示骨架屏，刷新时不显示
+    if (!isRefresh) {
+      setLoading(true);
+    }
     try {
       // 计算日期范围
       const now = new Date();
@@ -62,6 +66,7 @@ const WithdrawalExpenses: React.FC = () => {
       showNotification('error', `获取支出记录失败: ${e?.message || '未知错误'}`);
     } finally {
       setLoading(false);
+      setIsInitialLoad(false); // 🟢 修复：标记初始加载完成
     }
   };
 
@@ -69,11 +74,13 @@ const WithdrawalExpenses: React.FC = () => {
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
     interval: 30000, // 30秒刷新一次
-    onRefresh: fetchExpenses,
+    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
+    onRefresh: () => fetchExpenses(true), // 🟢 修复：传递 isRefresh=true，不显示骨架屏
   });
 
   useEffect(() => {
-    fetchExpenses();
+    setIsInitialLoad(true); // 🟢 修复：日期范围变化时，重新标记为初始加载
+    fetchExpenses(false);
   }, [dateRange]);
 
   useEffect(() => {
@@ -177,7 +184,7 @@ const WithdrawalExpenses: React.FC = () => {
             />
           </div>
           <ActionButton
-            onClick={fetchExpenses}
+            onClick={() => fetchExpenses(false)}
             loading={loading || isRefreshing}
             variant="secondary"
           >
@@ -197,7 +204,7 @@ const WithdrawalExpenses: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {loading ? (
+              {loading && isInitialLoad ? (
                 <tr><td colSpan={5} className="px-6 py-20"><TableSkeleton rows={5} cols={5} /></td></tr>
               ) : paginatedData.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-20"><EmptyState variant="database" title="暂无支出记录" description="当前筛选条件下没有找到支出记录" /></td></tr>

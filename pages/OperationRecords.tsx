@@ -11,6 +11,7 @@ const OperationRecords: React.FC = () => {
   const { notifications, showNotification, removeNotification } = useNotifications();
   const [records, setRecords] = useState<OperationRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'Withdrawal' | 'AirdropClaim'>('all');
 
@@ -18,8 +19,11 @@ const OperationRecords: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  const fetchRecords = async () => {
-    setLoading(true);
+  const fetchRecords = async (isRefresh = false) => {
+    // 🟢 修复：只在初始加载时显示骨架屏，刷新时不显示
+    if (!isRefresh) {
+      setLoading(true);
+    }
     try {
       const data = await getAdminOperationRecords({
         limit: 100,
@@ -32,6 +36,7 @@ const OperationRecords: React.FC = () => {
       showNotification('error', `获取操作记录失败: ${e?.message || '未知错误'}`);
     } finally {
       setLoading(false);
+      setIsInitialLoad(false); // 🟢 修复：标记初始加载完成
     }
   };
 
@@ -39,11 +44,13 @@ const OperationRecords: React.FC = () => {
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
     interval: 30000, // 30秒刷新一次
-    onRefresh: fetchRecords,
+    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
+    onRefresh: () => fetchRecords(true), // 🟢 修复：传递 isRefresh=true，不显示骨架屏
   });
 
   useEffect(() => {
-    fetchRecords();
+    setIsInitialLoad(true); // 🟢 修复：筛选条件变化时，重新标记为初始加载
+    fetchRecords(false);
   }, [typeFilter]);
 
   useEffect(() => {
@@ -147,7 +154,7 @@ const OperationRecords: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {loading ? (
+              {loading && isInitialLoad ? (
                 <tr><td colSpan={6} className="px-6 py-20"><TableSkeleton rows={5} cols={6} /></td></tr>
               ) : paginatedData.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-20"><EmptyState variant="database" title="暂无操作记录" description="当前筛选条件下没有找到操作记录" /></td></tr>
