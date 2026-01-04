@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './pages/Dashboard';
 import FinanceOps from './pages/FinanceOps';
 import OperationRecords from './pages/OperationRecords';
@@ -136,25 +137,27 @@ const App: React.FC = () => {
   }
 
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/revenue" element={<RevenuePage />} />
-          <Route path="/expenses" element={<WithdrawalExpenses />} />
-          <Route path="/yield" element={<YieldStrategy />} />
-          <Route path="/finance" element={<FinanceOps />} />
-          <Route path="/records" element={<OperationRecords />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/team" element={<TeamHierarchy />} />
-          <Route path="/broadcast" element={<BroadcastHistoryPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/contract" element={<ContractSettingsPage />} />
-          <Route path="/system" element={<SystemConfigPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/revenue" element={<RevenuePage />} />
+            <Route path="/expenses" element={<WithdrawalExpenses />} />
+            <Route path="/yield" element={<YieldStrategy />} />
+            <Route path="/finance" element={<FinanceOps />} />
+            <Route path="/records" element={<OperationRecords />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/team" element={<TeamHierarchy />} />
+            <Route path="/broadcast" element={<BroadcastHistoryPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/contract" element={<ContractSettingsPage />} />
+            <Route path="/system" element={<SystemConfigPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Layout>
+      </Router>
+    </ErrorBoundary>
   );
 };
 
