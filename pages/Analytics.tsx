@@ -61,11 +61,24 @@ const AnalyticsPage: React.FC = () => {
   const [cleanupDays, setCleanupDays] = useState(90);
   const [cleanupResult, setCleanupResult] = useState<{ deletedCount: number; error?: string } | null>(null);
 
+  // 🟢 修复：将日期格式转换为 ISO 8601 日期时间格式
+  const formatDateToISO = (dateString: string, isEndDate = false): string | undefined => {
+    if (!dateString) return undefined;
+    // 如果是 YYYY-MM-DD 格式，转换为 ISO 8601
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // 开始日期：当天的 00:00:00
+      // 结束日期：当天的 23:59:59
+      const time = isEndDate ? '23:59:59.999Z' : '00:00:00.000Z';
+      return `${dateString}T${time}`;
+    }
+    return dateString;
+  };
+
   const fetchSummary = useCallback(async () => {
     try {
       const data = await getVisitSummary({
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate: formatDateToISO(startDate, false),
+        endDate: formatDateToISO(endDate, true),
       });
       setSummary(data);
     } catch (error: any) {
@@ -81,8 +94,8 @@ const AnalyticsPage: React.FC = () => {
     }
     try {
       const data = await getVisitStats({
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate: formatDateToISO(startDate, false),
+        endDate: formatDateToISO(endDate, true),
         country: selectedCountry || undefined,
         limit: pagination.pageSize,
         offset: pagination.offset,
