@@ -28,6 +28,9 @@ import {
 import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getRatBalance, getUserEarnings } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
+import { useAutoRefresh } from '../hooks';
+import { Loading, EmptyState, TableSkeleton } from '../components';
+import { paginateData } from '../utils/pagination';
 
 // 扩展 User 类型，添加 RAT 余额字段
 interface UserWithRatBalance extends User {
@@ -262,6 +265,25 @@ const UsersPage: React.FC = () => {
     return users;
   }, [users]);
 
+  // 🟢 优化：客户端分页
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const { paginatedData, totalPages } = useMemo(() => {
+    return paginateData(filteredUsers, currentPage, itemsPerPage);
+  }, [filteredUsers, currentPage]);
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(p => p + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(p => p - 1);
+    }
+  };
+
   // 当搜索词变化时，重新获取用户列表
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -269,6 +291,17 @@ const UsersPage: React.FC = () => {
     }, 500); // 防抖
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1); // 搜索时重置到第一页
+  }, [searchTerm]);
+
+  // 🟢 优化：使用 useAutoRefresh Hook
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: true,
+    interval: 30000, // 30秒刷新一次
+    onRefresh: fetchUsers,
+  });
 
   const truncateAddress = (addr: string | null) => {
     if (!addr) return '无';
@@ -317,8 +350,10 @@ const UsersPage: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
               {loading ? (
-                <tr><td colSpan={4} className="px-6 py-20 text-center text-zinc-500 animate-pulse italic">同步用户数据...</td></tr>
-              ) : filteredUsers.map((user) => (
+                <tr><td colSpan={4} className="px-6 py-20"><TableSkeleton rows={5} cols={4} /></td></tr>
+              ) : paginatedData.length === 0 ? (
+                <tr><td colSpan={4} className="px-6 py-20"><EmptyState variant="database" title="暂无用户" description="当前搜索条件下没有找到用户" /></td></tr>
+              ) : paginatedData.map((user) => (
                 <tr key={user.address} className="hover:bg-zinc-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -366,6 +401,34 @@ const UsersPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* 🟢 优化：分页控件 */}
+      {!loading && filteredUsers.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+          <div className="text-xs text-zinc-500">
+            显示第 {(currentPage - 1) * 20 + 1} - {Math.min(currentPage * 20, filteredUsers.length)} 条，共 {filteredUsers.length} 条
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={prevPage}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-xs font-medium bg-zinc-800 border border-zinc-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+            >
+              上一页
+            </button>
+            <span className="text-xs text-zinc-400 font-medium">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={nextPage}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-xs font-medium bg-zinc-800 border border-zinc-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 用户详情抽屉 */}
       {selectedUser && (
@@ -478,7 +541,7 @@ const UsersPage: React.FC = () => {
                 </div>
                 <div className="p-4 min-h-[160px] max-h-[300px] overflow-y-auto">
                   {detailsLoading ? (
-                    <div className="text-center py-10 text-zinc-500 animate-pulse">加载中...</div>
+                    <Loading type="spinner" />
                   ) : activeTab === 'withdrawals' ? (
                     withdrawals.length > 0 ? (
                       <div className="space-y-2">
@@ -499,7 +562,7 @@ const UsersPage: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase tracking-widest">暂无提现记录</div>
+                      <EmptyState variant="database" title="暂无提现记录" description="该用户还没有提现记录" />
                     )
                   ) : activeTab === 'airdrops' ? (
                     airdropClaims.length > 0 ? (
@@ -515,10 +578,10 @@ const UsersPage: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase tracking-widest">暂无空投记录</div>
+                      <EmptyState variant="database" title="暂无空投记录" description="该用户还没有空投记录" />
                     )
                   ) : (
-                    <div className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase tracking-widest">暂无记录</div>
+                    <EmptyState variant="database" title="暂无记录" description="该用户还没有相关记录" />
                   )}
                 </div>
               </div>

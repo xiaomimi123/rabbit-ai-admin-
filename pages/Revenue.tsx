@@ -15,6 +15,9 @@ import {
 import { getAdminRevenue, getRevenueStats } from '../lib/api';
 import { RevenueRecord } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
+import { useAutoRefresh } from '../hooks';
+import { Loading, EmptyState, ActionButton, TableSkeleton } from '../components';
+import { paginateData } from '../utils/pagination';
 
 const RevenuePage: React.FC = () => {
   const [records, setRecords] = useState<RevenueRecord[]>([]);
@@ -29,6 +32,16 @@ const RevenuePage: React.FC = () => {
   } | null>(null);
   const { notifications, showNotification, removeNotification } = useNotifications();
 
+  // 🟢 优化：使用 useAutoRefresh Hook
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: true,
+    interval: 30000, // 30秒刷新一次
+    onRefresh: () => {
+      fetchRevenue();
+      fetchStats();
+    },
+  });
+
   useEffect(() => {
     fetchRevenue();
     fetchStats();
@@ -38,8 +51,9 @@ const RevenuePage: React.FC = () => {
     try {
       const data = await getRevenueStats();
       setStats(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('获取收益统计失败', e);
+      showNotification('error', `获取收益统计失败: ${e?.message || '未知错误'}`);
     }
   };
 
@@ -72,8 +86,9 @@ const RevenuePage: React.FC = () => {
         timestamp: new Date(item.timestamp).toLocaleString(),
         txHash: item.txHash,
       })));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification('error', `获取收益记录失败: ${e?.message || '未知错误'}`);
     } finally {
       setLoading(false);
     }
@@ -82,6 +97,29 @@ const RevenuePage: React.FC = () => {
   const filteredRecords = useMemo(() => {
     return records.filter(r => r.address.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [records, searchTerm]);
+
+  // 🟢 优化：客户端分页
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const { paginatedData, totalPages } = useMemo(() => {
+    return paginateData(filteredRecords, currentPage, itemsPerPage);
+  }, [filteredRecords, currentPage]);
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(p => p + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(p => p - 1);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentPage(1); // 搜索时重置到第一页
+  }, [searchTerm]);
 
   const totalRevenue = useMemo(() => {
     // 如果 stats 有数据，优先使用 stats 的 totalRevenue（今日累计）
@@ -183,9 +221,16 @@ const RevenuePage: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button onClick={fetchRevenue} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all">
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <ActionButton
+            onClick={() => {
+              fetchRevenue();
+              fetchStats();
+            }}
+            loading={loading || isRefreshing}
+            variant="secondary"
+          >
+            <RefreshCw size={18} className={loading || isRefreshing ? 'animate-spin' : ''} />
+          </ActionButton>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/30">
@@ -200,8 +245,10 @@ const RevenuePage: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
               {loading ? (
-                <tr><td colSpan={4} className="px-6 py-20 text-center text-zinc-600 animate-pulse italic">同步链上收益明细中...</td></tr>
-              ) : filteredRecords.map((rec) => (
+                <tr><td colSpan={4} className="px-6 py-20"><TableSkeleton rows={5} cols={4} /></td></tr>
+              ) : paginatedData.length === 0 ? (
+                <tr><td colSpan={4} className="px-6 py-20"><EmptyState variant="database" title="暂无收益记录" description="当前筛选条件下没有找到收益记录" /></td></tr>
+              ) : paginatedData.map((rec) => (
                 <tr key={rec.id} className="hover:bg-zinc-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <span className="text-xs font-medium text-zinc-400">{rec.timestamp}</span>
@@ -222,6 +269,34 @@ const RevenuePage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* 🟢 优化：分页控件 */}
+        {!loading && filteredRecords.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border-t border-zinc-800">
+            <div className="text-xs text-zinc-500">
+              显示第 {(currentPage - 1) * 20 + 1} - {Math.min(currentPage * 20, filteredRecords.length)} 条，共 {filteredRecords.length} 条
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={prevPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-xs font-medium bg-zinc-800 border border-zinc-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+              >
+                上一页
+              </button>
+              <span className="text-xs text-zinc-400 font-medium">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={nextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-xs font-medium bg-zinc-800 border border-zinc-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+              >
+                下一页
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, AlertCircle, Coins, Gem, TrendingUp, TrendingDown, PieChart } from 'lucide-react';
+import { Users, AlertCircle, Coins, Gem, TrendingUp, TrendingDown, PieChart, RefreshCw } from 'lucide-react';
 import { getAdminKPIs, getTopRATHolders, getAdminUserList } from '../lib/api';
 import { KPIResponse } from '../types';
+import { useAutoRefresh } from '../hooks';
+import { CardSkeleton, EmptyState, useNotifications, NotificationContainer } from '../components';
 
 const Dashboard: React.FC = () => {
+  const { notifications, showNotification, removeNotification } = useNotifications();
   const [kpis, setKpis] = useState<KPIResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [topHolders, setTopHolders] = useState<Array<{ rank: number; address: string; balance: number }>>([]);
@@ -47,8 +50,9 @@ const Dashboard: React.FC = () => {
       
       setKpis(mockData);
       setTopHolders(holders.items || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取 KPI 失败', error);
+      showNotification('error', `获取 KPI 失败: ${error?.message || '未知错误'}`);
       
       // 🟢 修复：如果 KPI API 失败，尝试从用户列表 API 获取用户总数
       if (usersTotal === 0) {
@@ -57,8 +61,9 @@ const Dashboard: React.FC = () => {
           const userListData = await getAdminUserList({ limit: 1, offset: 0 });
           usersTotal = userListData.total || 0;
           console.log('[Dashboard] 从用户列表获取到的用户总数:', usersTotal);
-        } catch (userListError) {
+        } catch (userListError: any) {
           console.error('[Dashboard] 从用户列表获取用户总数也失败:', userListError);
+          showNotification('warning', '无法获取用户总数，部分数据可能不准确');
         }
       }
       
@@ -73,20 +78,21 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showNotification]);
 
-  useEffect(() => {
-    fetchKPIs();
-    const interval = setInterval(fetchKPIs, 15000);
-    return () => clearInterval(interval);
-  }, [fetchKPIs]);
+  // 🟢 优化：使用 useAutoRefresh Hook
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: true,
+    interval: 15000,
+    onRefresh: fetchKPIs,
+  });
 
   if (loading && !kpis) {
-    return <div className="animate-pulse space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1,2,3,4].map(i => <div key={i} className="h-32 bg-zinc-900 rounded-xl border border-zinc-800" />)}
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <CardSkeleton count={4} />
       </div>
-    </div>;
+    );
   }
 
   const cards = [
@@ -121,11 +127,24 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">数据概览</h2>
-        <p className="text-zinc-400 text-sm">RAT 持币生息系统核心指标监控，不含质押 TVL 统计。</p>
-      </div>
+    <>
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-white">数据概览</h2>
+            <p className="text-zinc-400 text-sm">RAT 持币生息系统核心指标监控，不含质押 TVL 统计。</p>
+          </div>
+          {isRefreshing && (
+            <div className="text-xs text-zinc-500 flex items-center gap-2">
+              <RefreshCw size={14} className="animate-spin" />
+              刷新中...
+            </div>
+          )}
+        </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((card, i) => (
@@ -180,7 +199,11 @@ const Dashboard: React.FC = () => {
           <h4 className="text-sm font-semibold mb-4 text-white">RAT 持币大户排行</h4>
           <div className="space-y-4 overflow-y-auto pr-2">
             {topHolders.length === 0 ? (
-              <div className="text-center py-10 text-zinc-500 text-xs">暂无持币数据</div>
+              <EmptyState
+                variant="database"
+                title="暂无持币数据"
+                description="还没有用户持有 RAT 代币"
+              />
             ) : (
               topHolders.map((holder) => {
                 const maxBalance = topHolders[0]?.balance || 1;
@@ -207,6 +230,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

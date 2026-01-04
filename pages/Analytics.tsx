@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Globe, Users, Clock, MapPin, Monitor, Smartphone, RefreshCw, Filter, Download, Database, Trash2, AlertTriangle } from 'lucide-react';
 import { getVisitStats, getVisitSummary, getAnalyticsStats, cleanupOldVisits } from '../lib/api';
+import { usePagination, useAutoRefresh } from '../hooks';
+import { Loading, TableSkeleton, CardSkeleton, EmptyState, ActionButton, useNotifications, NotificationContainer } from '../components';
 
 interface VisitItem {
   id: number;
@@ -25,6 +27,10 @@ interface CountryDistribution {
 }
 
 const AnalyticsPage: React.FC = () => {
+  // 🟢 优化：使用新的 Hooks
+  const pagination = usePagination({ pageSize: 50 });
+  const { notifications, showNotification, removeNotification } = useNotifications();
+  
   const [summary, setSummary] = useState<{
     totalVisits: number;
     todayVisits: number;
@@ -34,9 +40,6 @@ const AnalyticsPage: React.FC = () => {
   const [visits, setVisits] = useState<VisitItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingVisits, setLoadingVisits] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
   
   // 筛选条件
   const [selectedCountry, setSelectedCountry] = useState<string>('');
@@ -63,10 +66,11 @@ const AnalyticsPage: React.FC = () => {
         endDate: endDate || undefined,
       });
       setSummary(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取访问统计摘要失败:', error);
+      showNotification('error', `获取访问统计摘要失败: ${error?.message || '未知错误'}`);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, showNotification]);
 
   const fetchVisits = useCallback(async () => {
     setLoadingVisits(true);
@@ -75,17 +79,18 @@ const AnalyticsPage: React.FC = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         country: selectedCountry || undefined,
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
+        limit: pagination.pageSize,
+        offset: pagination.offset,
       });
       setVisits(data.items || []);
-      setTotal(data.total || 0);
-    } catch (error) {
+      pagination.setTotal(data.total || 0);
+    } catch (error: any) {
       console.error('获取访问记录失败:', error);
+      showNotification('error', `获取访问记录失败: ${error?.message || '未知错误'}`);
     } finally {
       setLoadingVisits(false);
     }
-  }, [page, pageSize, selectedCountry, startDate, endDate]);
+  }, [pagination, selectedCountry, startDate, endDate, showNotification]);
 
   // 🟢 新增：获取数据统计
   const fetchStats = useCallback(async () => {
@@ -93,12 +98,13 @@ const AnalyticsPage: React.FC = () => {
     try {
       const data = await getAnalyticsStats();
       setStats(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取数据统计失败:', error);
+      showNotification('error', `获取数据统计失败: ${error?.message || '未知错误'}`);
     } finally {
       setLoadingStats(false);
     }
-  }, []);
+  }, [showNotification]);
 
   // 🟢 新增：清理旧数据
   const handleCleanup = useCallback(async () => {
@@ -112,31 +118,46 @@ const AnalyticsPage: React.FC = () => {
       const result = await cleanupOldVisits(cleanupDays);
       setCleanupResult(result);
       if (result.ok) {
+        showNotification('success', `成功删除 ${result.deletedCount.toLocaleString()} 条记录`);
         // 清理成功后刷新数据
         await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
+      } else {
+        showNotification('error', result.error || '清理失败');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('清理数据失败:', error);
-      setCleanupResult({ deletedCount: 0, error: String(error) });
+      const errorMsg = error?.message || String(error);
+      setCleanupResult({ deletedCount: 0, error: errorMsg });
+      showNotification('error', `清理数据失败: ${errorMsg}`);
     } finally {
       setCleaning(false);
     }
-  }, [cleanupDays, fetchSummary, fetchVisits, fetchStats]);
+  }, [cleanupDays, fetchSummary, fetchVisits, fetchStats, showNotification]);
+
+  // 🟢 优化：使用 useAutoRefresh Hook
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
+  }, [fetchSummary, fetchVisits, fetchStats]);
+
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: false, // 默认不自动刷新，用户可手动刷新
+    interval: 30000,
+    onRefresh: handleRefresh,
+  });
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
+      await handleRefresh();
       setLoading(false);
     };
     loadData();
-  }, [fetchSummary, fetchVisits, fetchStats]);
+  }, []); // 只在组件挂载时加载一次
 
-  const handleRefresh = () => {
-    fetchSummary();
+  // 当筛选条件或分页变化时，重新加载访问记录
+  useEffect(() => {
     fetchVisits();
-    fetchStats();
-  };
+  }, [pagination.page, selectedCountry, startDate, endDate, fetchVisits]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -162,29 +183,32 @@ const AnalyticsPage: React.FC = () => {
   if (loading && !summary) {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="animate-pulse space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <div key={i} className="h-32 bg-zinc-900 rounded-xl border border-zinc-800" />)}
-          </div>
-        </div>
+        <CardSkeleton count={4} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <>
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">访问统计</h2>
           <p className="text-zinc-400 text-sm">查看用户访问前端的详细数据（IP、国家、时间等）</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-all"
+        <ActionButton
+          variant="secondary"
+          size="md"
+          onClick={refresh}
+          loading={isRefreshing}
         >
           <RefreshCw size={16} />
           刷新
-        </button>
+        </ActionButton>
       </div>
 
       {/* 统计卡片 */}
@@ -247,14 +271,15 @@ const AnalyticsPage: React.FC = () => {
             <Database size={20} className="text-blue-400" />
             数据管理
           </h3>
-          <button
+          <ActionButton
+            variant="secondary"
+            size="sm"
             onClick={fetchStats}
-            disabled={loadingStats}
-            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-all disabled:opacity-50"
+            loading={loadingStats}
           >
-            <RefreshCw size={14} className={loadingStats ? 'animate-spin' : ''} />
+            <RefreshCw size={14} />
             刷新统计
-          </button>
+          </ActionButton>
         </div>
 
         {loadingStats ? (
@@ -318,23 +343,16 @@ const AnalyticsPage: React.FC = () => {
                   />
                   <p className="text-zinc-500 text-xs mt-1">保留最近 N 天的数据，删除更早的记录</p>
                 </div>
-                <button
+                <ActionButton
+                  variant="danger"
+                  size="md"
                   onClick={handleCleanup}
-                  disabled={cleaning || stats.totalRecords === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  loading={cleaning}
+                  disabled={stats.totalRecords === 0}
                 >
-                  {cleaning ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      清理中...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 size={16} />
-                      清理旧数据
-                    </>
-                  )}
-                </button>
+                  <Trash2 size={16} />
+                  清理旧数据
+                </ActionButton>
               </div>
 
               {cleanupResult && (
@@ -406,7 +424,7 @@ const AnalyticsPage: React.FC = () => {
               value={selectedCountry}
               onChange={(e) => {
                 setSelectedCountry(e.target.value);
-                setPage(1); // 重置到第一页
+                pagination.goToPage(1); // 重置到第一页
               }}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             >
@@ -425,7 +443,7 @@ const AnalyticsPage: React.FC = () => {
               value={startDate}
               onChange={(e) => {
                 setStartDate(e.target.value);
-                setPage(1);
+                pagination.goToPage(1);
               }}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
@@ -437,7 +455,7 @@ const AnalyticsPage: React.FC = () => {
               value={endDate}
               onChange={(e) => {
                 setEndDate(e.target.value);
-                setPage(1);
+                pagination.goToPage(1);
               }}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
@@ -449,13 +467,37 @@ const AnalyticsPage: React.FC = () => {
       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
         <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">访问记录</h3>
-          <p className="text-sm text-zinc-400">共 {total.toLocaleString()} 条记录</p>
+          <p className="text-sm text-zinc-400">共 {pagination.total.toLocaleString()} 条记录</p>
         </div>
         
         {loadingVisits ? (
-          <div className="p-8 text-center text-zinc-500">加载中...</div>
+          <div className="p-8">
+            <TableSkeleton rows={5} cols={7} />
+          </div>
         ) : visits.length === 0 ? (
-          <div className="p-8 text-center text-zinc-500">暂无访问记录</div>
+          <EmptyState
+            variant="database"
+            title="暂无访问记录"
+            description={selectedCountry || startDate || endDate 
+              ? "当前筛选条件下没有找到访问记录，请尝试调整筛选条件"
+              : "还没有任何访问记录"}
+            action={
+              (selectedCountry || startDate || endDate) && (
+                <ActionButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCountry('');
+                    setStartDate('');
+                    setEndDate('');
+                    pagination.reset();
+                  }}
+                >
+                  清除筛选
+                </ActionButton>
+              )
+            }
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -523,36 +565,39 @@ const AnalyticsPage: React.FC = () => {
             </div>
 
             {/* 分页 */}
-            {total > pageSize && (
+            {pagination.total > pagination.pageSize && (
               <div className="p-6 border-t border-zinc-800 flex items-center justify-between">
                 <p className="text-sm text-zinc-400">
-                  显示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} 条，共 {total} 条
+                  显示 {pagination.offset + 1} - {Math.min(pagination.offset + pagination.pageSize, pagination.total)} 条，共 {pagination.total.toLocaleString()} 条
                 </p>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300 text-sm rounded-lg transition-all"
+                  <ActionButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={pagination.prevPage}
+                    disabled={!pagination.hasPrev}
                   >
                     上一页
-                  </button>
+                  </ActionButton>
                   <span className="text-sm text-zinc-400">
-                    第 {page} / {Math.ceil(total / pageSize)} 页
+                    第 {pagination.page} / {pagination.totalPages} 页
                   </span>
-                  <button
-                    onClick={() => setPage(p => Math.min(Math.ceil(total / pageSize), p + 1))}
-                    disabled={page >= Math.ceil(total / pageSize)}
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300 text-sm rounded-lg transition-all"
+                  <ActionButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={pagination.nextPage}
+                    disabled={!pagination.hasNext}
                   >
                     下一页
-                  </button>
+                  </ActionButton>
                 </div>
               </div>
             )}
-          </>
+          </> 
         )}
       </div>
     </div>
+    </>
   );
 };
 
