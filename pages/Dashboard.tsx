@@ -16,10 +16,15 @@ const Dashboard: React.FC = () => {
     let usersTotal = 0;
     
     try {
-      const [data, holders] = await Promise.all([
+      // 🟢 优化：先获取基础数据，RAT 总持仓量异步加载（避免阻塞）
+      const [data] = await Promise.all([
         getAdminKPIs(),
-        getTopRATHolders(5).catch(() => ({ ok: true, items: [] })), // 如果失败，返回空数组
       ]);
+      
+      // 🟢 优化：RAT 持币大户异步加载，不阻塞主数据
+      getTopRATHolders(5)
+        .then((holders) => setTopHolders(holders.items || []))
+        .catch(() => setTopHolders([])); // 如果失败，设置为空数组
       
       console.log('[Dashboard] KPI 数据:', data); // 🟢 调试日志
       

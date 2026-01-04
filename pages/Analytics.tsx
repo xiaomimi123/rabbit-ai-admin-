@@ -39,6 +39,7 @@ const AnalyticsPage: React.FC = () => {
   } | null>(null);
   const [visits, setVisits] = useState<VisitItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [loadingVisits, setLoadingVisits] = useState(false);
   
   // 筛选条件
@@ -135,23 +136,29 @@ const AnalyticsPage: React.FC = () => {
   }, [cleanupDays, fetchSummary, fetchVisits, fetchStats, showNotification]);
 
   // 🟢 优化：使用 useAutoRefresh Hook
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
+  const handleRefresh = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) {
+      setLoading(true);
+    }
+    try {
+      await Promise.all([fetchSummary(), fetchVisits(), fetchStats()]);
+    } finally {
+      if (!isRefresh) {
+        setLoading(false);
+        setIsInitialLoad(false);
+      }
+    }
   }, [fetchSummary, fetchVisits, fetchStats]);
 
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: false, // 默认不自动刷新，用户可手动刷新
     interval: 30000,
-    onRefresh: handleRefresh,
+    onRefresh: () => handleRefresh(true), // 🟢 修复：传递 isRefresh=true，避免设置 loading
+    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
   });
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await handleRefresh();
-      setLoading(false);
-    };
-    loadData();
+    handleRefresh(false); // 初始加载
   }, []); // 只在组件挂载时加载一次
 
   // 当筛选条件或分页变化时，重新加载访问记录
@@ -180,7 +187,7 @@ const AnalyticsPage: React.FC = () => {
     return flags[code] || '🌍';
   };
 
-  if (loading && !summary) {
+  if (loading && isInitialLoad) {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
         <CardSkeleton count={4} />

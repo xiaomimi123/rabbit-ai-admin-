@@ -97,18 +97,32 @@ const UsersPage: React.FC = () => {
       });
       
       // 🟢 优化：直接使用后端返回的 RAT 余额，无需链上查询
-      const usersList = data.items.map((item) => ({
-        address: item.address,
-        energyTotal: item.energyTotal,
-        energyLocked: item.energyLocked,
-        inviteCount: item.inviteCount,
-        referrer: item.referrer,
-        registeredAt: new Date(item.registeredAt).toLocaleString(),
-        lastActive: new Date(item.lastActive).toLocaleString(),
-        usdtBalance: item.usdtBalance,
-        ratBalance: item.ratBalance || 0, // 🟢 直接使用后端返回的值
-        ratLocked: 0, // RAT 锁定余额暂时设为 0，后续可以从数据库获取
-      }));
+      const usersList = data.items.map((item) => {
+        // 🟢 修复：确保 ratBalance 正确解析（可能是 undefined、null 或 0）
+        const ratBalance = item.ratBalance !== undefined && item.ratBalance !== null 
+          ? Number(item.ratBalance) 
+          : 0;
+        
+        console.log(`[Users] 用户 ${item.address} RAT 余额:`, {
+          ratBalance: item.ratBalance,
+          parsed: ratBalance,
+          ratBalanceWei: item.ratBalanceWei,
+          ratBalanceUpdatedAt: item.ratBalanceUpdatedAt,
+        }); // 🟢 调试日志
+        
+        return {
+          address: item.address,
+          energyTotal: item.energyTotal,
+          energyLocked: item.energyLocked,
+          inviteCount: item.inviteCount,
+          referrer: item.referrer,
+          registeredAt: new Date(item.registeredAt).toLocaleString(),
+          lastActive: new Date(item.lastActive).toLocaleString(),
+          usdtBalance: item.usdtBalance,
+          ratBalance: ratBalance, // 🟢 修复：确保是数字类型
+          ratLocked: 0, // RAT 锁定余额暂时设为 0，后续可以从数据库获取
+        };
+      });
       
       setUsers(usersList);
       setLoading(false);
