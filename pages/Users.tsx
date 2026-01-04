@@ -23,14 +23,16 @@ import {
   AlertCircle,
   Gem,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { getAdminUserList, getAdminUser, adjustUserAsset, sendUserNotification, getUserEarnings } from '../lib/api';
 import { User, Withdrawal, ClaimRecord, Message } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 import { useAutoRefresh } from '../hooks';
 import { Loading, EmptyState, TableSkeleton } from '../components';
-import { paginateData } from '../utils/pagination';
 
 // 扩展 User 类型，添加 RAT 余额字段
 interface UserWithRatBalance extends User {
@@ -40,11 +42,18 @@ interface UserWithRatBalance extends User {
 
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<UserWithRatBalance[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0); // 🟢 新增：总用户数（用于服务端分页）
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserWithRatBalance | null>(null);
   const [activeTab, setActiveTab] = useState<'withdrawals' | 'energy' | 'airdrops' | 'messages'>('energy');
+  
+  // 🟢 新增：服务端分页和排序状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const [sortBy, setSortBy] = useState<'ratBalance' | 'inviteCount' | 'createdAt'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   // 详情数据状态
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -90,10 +99,15 @@ const UsersPage: React.FC = () => {
       setLoading(true);
     }
     try {
+      // 🟢 服务端分页：根据当前页计算 offset
+      const offset = (currentPage - 1) * itemsPerPage;
+      
       const data = await getAdminUserList({
-        limit: 100,
-        offset: 0,
+        limit: itemsPerPage,
+        offset: offset,
         search: searchTerm || undefined,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
       });
       
       // 🟢 优化：直接使用后端返回的 RAT 余额，无需链上查询
@@ -102,13 +116,6 @@ const UsersPage: React.FC = () => {
         const ratBalance = item.ratBalance !== undefined && item.ratBalance !== null 
           ? Number(item.ratBalance) 
           : 0;
-        
-        console.log(`[Users] 用户 ${item.address} RAT 余额:`, {
-          ratBalance: item.ratBalance,
-          parsed: ratBalance,
-          ratBalanceWei: item.ratBalanceWei,
-          ratBalanceUpdatedAt: item.ratBalanceUpdatedAt,
-        }); // 🟢 调试日志
         
         return {
           address: item.address,
@@ -125,13 +132,13 @@ const UsersPage: React.FC = () => {
       });
       
       setUsers(usersList);
+      setTotalUsers(data.total || 0); // 🟢 保存总用户数
       setLoading(false);
       setIsInitialLoad(false);
-      
-      // 🟢 移除：不再需要异步查询链上 RAT 余额
     } catch (e) {
       console.error(e);
       setLoading(false);
+      showNotification('error', '加载用户列表失败');
     }
   };
 
@@ -240,17 +247,22 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  const filteredUsers = useMemo(() => {
-    // 搜索已经在API层面处理，这里直接返回users
-    return users;
-  }, [users]);
+  // 🟢 排序处理函数
+  const handleSort = (field: 'ratBalance' | 'inviteCount' | 'createdAt') => {
+    if (sortBy === field) {
+      // 如果点击的是当前排序列，切换排序方向
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // 如果点击的是新列，设置为降序
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+    // 排序时重置到第一页
+    setCurrentPage(1);
+  };
 
-  // 🟢 优化：客户端分页
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
-  const { paginatedData, totalPages } = useMemo(() => {
-    return paginateData(filteredUsers, currentPage, itemsPerPage);
-  }, [filteredUsers, currentPage]);
+  // 🟢 计算总页数（基于服务端返回的总数）
+  const totalPages = Math.ceil(totalUsers / itemsPerPage);
 
   const nextPage = () => {
     if (currentPage < totalPages) {
@@ -263,19 +275,29 @@ const UsersPage: React.FC = () => {
       setCurrentPage(p => p - 1);
     }
   };
+  
+  // 🟢 排序图标组件
+  const SortIcon = ({ field }: { field: 'ratBalance' | 'inviteCount' | 'createdAt' }) => {
+    if (sortBy !== field) {
+      return <ArrowUpDown size={12} className="text-zinc-600" />;
+    }
+    return sortOrder === 'asc' 
+      ? <ArrowUp size={12} className="text-emerald-500" />
+      : <ArrowDown size={12} className="text-emerald-500" />;
+  };
 
-  // 当搜索词变化时，重新获取用户列表
+  // 🟢 当搜索词、排序、分页变化时，重新获取用户列表
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitialLoad(true); // 🟢 修复：搜索时重新标记为初始加载
       fetchUsers(false);
     }, 500); // 防抖
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, sortBy, sortOrder, currentPage]); // 🟢 添加排序和分页依赖
 
   useEffect(() => {
-    setCurrentPage(1); // 搜索时重置到第一页
-  }, [searchTerm]);
+    setCurrentPage(1); // 搜索或排序时重置到第一页
+  }, [searchTerm, sortBy, sortOrder]);
 
   // 🟢 优化：使用 useAutoRefresh Hook
   const { refresh, isRefreshing } = useAutoRefresh({
@@ -329,17 +351,33 @@ const UsersPage: React.FC = () => {
             <thead className="sticky top-0 bg-[#09090b] z-10">
               <tr className="border-b border-zinc-800">
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">用户</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">RAT 持仓/能量值</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">邀请人数</th>
+                <th 
+                  className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-emerald-500 transition-colors"
+                  onClick={() => handleSort('ratBalance')}
+                >
+                  <div className="flex items-center gap-2">
+                    RAT 持仓/能量值
+                    <SortIcon field="ratBalance" />
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-emerald-500 transition-colors"
+                  onClick={() => handleSort('inviteCount')}
+                >
+                  <div className="flex items-center gap-2">
+                    邀请人数
+                    <SortIcon field="inviteCount" />
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
               {loading && isInitialLoad ? (
                 <tr><td colSpan={4} className="px-6 py-20"><TableSkeleton rows={5} cols={4} /></td></tr>
-              ) : paginatedData.length === 0 ? (
+              ) : users.length === 0 ? (
                 <tr><td colSpan={4} className="px-6 py-20"><EmptyState variant="database" title="暂无用户" description="当前搜索条件下没有找到用户" /></td></tr>
-              ) : paginatedData.map((user) => (
+              ) : users.map((user) => (
                 <tr key={user.address} className="hover:bg-zinc-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -379,11 +417,11 @@ const UsersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 🟢 优化：分页控件 */}
-      {!loading && filteredUsers.length > 0 && totalPages > 1 && (
+      {/* 🟢 优化：分页控件（服务端分页） */}
+      {!loading && users.length > 0 && totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
           <div className="text-xs text-zinc-500">
-            显示第 {(currentPage - 1) * 20 + 1} - {Math.min(currentPage * 20, filteredUsers.length)} 条，共 {filteredUsers.length} 条
+            显示第 {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalUsers)} 条，共 {totalUsers} 条
           </div>
           <div className="flex items-center gap-2">
             <button

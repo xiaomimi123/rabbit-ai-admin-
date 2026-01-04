@@ -306,11 +306,15 @@ export async function getAdminUserList(params: {
   limit?: number;
   offset?: number;
   search?: string;
+  sortBy?: 'ratBalance' | 'inviteCount' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
 }) {
   const query = new URLSearchParams();
   if (params.limit) query.set('limit', String(params.limit));
   if (params.offset) query.set('offset', String(params.offset));
   if (params.search) query.set('search', params.search);
+  if (params.sortBy) query.set('sortBy', params.sortBy);
+  if (params.sortOrder) query.set('sortOrder', params.sortOrder);
   return apiFetch<{
     ok: boolean;
     items: Array<{
