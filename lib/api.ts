@@ -391,7 +391,7 @@ export async function getAnalyticsStats() {
     newestRecord: string | null;
     estimatedSize: string;
     recordsByMonth: Array<{ month: string; count: number }>;
-  }>('/api/admin/analytics/stats');
+  }>('/admin/analytics/stats');
 }
 
 // 🟢 新增：清理旧访问数据
@@ -400,7 +400,7 @@ export async function cleanupOldVisits(daysToKeep: number = 90) {
     ok: boolean;
     deletedCount: number;
     error?: string;
-  }>('/api/admin/analytics/cleanup', {
+  }>('/admin/analytics/cleanup', {
     method: 'POST',
     body: JSON.stringify({ daysToKeep }),
   });
