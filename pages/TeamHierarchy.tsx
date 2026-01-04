@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Search, Users, ArrowUp, ArrowDown, Copy, ExternalLink, Zap, UserPlus, Calendar, RefreshCw } from 'lucide-react';
+import { Search, Users, ArrowUp, ArrowDown, Copy, ExternalLink, Zap, UserPlus, Calendar } from 'lucide-react';
 import { getUserTeam } from '../lib/api';
 import { useNotifications, NotificationContainer } from '../components/Notification';
+import { Loading, EmptyState, ActionButton } from '../components';
 
 interface TeamMember {
   address: string;
@@ -138,23 +139,14 @@ const TeamHierarchy: React.FC = () => {
               className="w-full pl-12 pr-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm"
             />
           </div>
-          <button
+          <ActionButton
             onClick={handleSearch}
-            disabled={loading}
-            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center gap-2 transition-all"
+            loading={loading}
+            variant="primary"
           >
-            {loading ? (
-              <>
-                <RefreshCw size={18} className="animate-spin" />
-                查询中...
-              </>
-            ) : (
-              <>
-                <Search size={18} />
-                查询
-              </>
-            )}
-          </button>
+            <Search size={18} />
+            查询
+          </ActionButton>
         </div>
       </div>
 
@@ -245,10 +237,7 @@ const TeamHierarchy: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl text-center">
-                <Users className="mx-auto mb-3 text-zinc-600" size={32} />
-                <p className="text-sm text-zinc-500">该用户暂无下级团队成员</p>
-              </div>
+              <EmptyState variant="database" title="暂无下级团队成员" description="该用户还没有邀请任何下级成员" />
             )}
           </div>
         </div>
@@ -256,10 +245,13 @@ const TeamHierarchy: React.FC = () => {
 
       {/* 空状态 */}
       {!target && !loading && (
-        <div className="p-12 bg-zinc-900/40 border border-zinc-800 rounded-2xl text-center">
-          <Search className="mx-auto mb-4 text-zinc-600" size={48} />
-          <p className="text-zinc-500 mb-2">请输入钱包地址进行查询</p>
-          <p className="text-xs text-zinc-600">支持查询用户的上级推荐人和下级团队成员关系</p>
+        <EmptyState variant="search" title="请输入钱包地址进行查询" description="支持查询用户的上级推荐人和下级团队成员关系" />
+      )}
+
+      {/* 加载状态 */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loading type="spinner" message="查询中..." />
         </div>
       )}
     </div>

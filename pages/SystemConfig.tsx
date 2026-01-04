@@ -1,34 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe, CheckCircle2, XCircle, Wallet } from 'lucide-react';
+import { Save, RefreshCw, Lock, Info, Cpu, Image, Globe, Wallet } from 'lucide-react';
 import { getSystemConfig, updateSystemConfig } from '../lib/api';
 import { SystemConfig } from '../types';
-
-interface Notification {
-  id: string;
-  type: 'success' | 'error';
-  message: string;
-}
+import { useNotifications, NotificationContainer } from '../components/Notification';
+import { Loading, ActionButton } from '../components';
 
 const SystemConfigPage: React.FC = () => {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  // 🟢 优化：使用统一的 useNotifications Hook
+  const { notifications, showNotification, removeNotification } = useNotifications();
 
   useEffect(() => {
     fetchConfigs();
   }, []);
-
-  // 显示通知
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    const id = Date.now().toString();
-    setNotifications(prev => [...prev, { id, type, message }]);
-    // 3秒后自动移除
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 3000);
-  };
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -187,17 +175,18 @@ const SystemConfigPage: React.FC = () => {
                     }
                   }}
                 />
-                <button 
+                <ActionButton
                   onClick={() => {
                     const valueToSave = localValues[config.key] !== undefined ? localValues[config.key] : config.value || '';
                     handleUpdate(config.key, valueToSave);
                   }}
-                  disabled={savingKey === config.key}
-                  className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:bg-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-400 border border-emerald-500/30 rounded-xl transition-all"
+                  loading={savingKey === config.key}
+                  variant="ghost"
+                  className="p-2.5"
                   title="保存配置"
                 >
-                  {savingKey === config.key ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
-                </button>
+                  <Save size={18} />
+                </ActionButton>
               </div>
             </div>
           ))}
@@ -207,44 +196,29 @@ const SystemConfigPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-12 max-w-5xl mx-auto">
-      {/* 通知组件 */}
-      <div className="fixed top-20 right-6 z-50 space-y-2">
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-md animate-in slide-in-from-right ${
-              notification.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                : 'bg-red-500/10 border-red-500/20 text-red-400'
-            }`}
-          >
-            {notification.type === 'success' ? (
-              <CheckCircle2 size={20} />
-            ) : (
-              <XCircle size={20} />
-            )}
-            <span className="text-sm font-medium">{notification.message}</span>
+    <>
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      <div className="space-y-12 max-w-5xl mx-auto">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-white">系统配置</h2>
+            <p className="text-zinc-400 text-sm">管理系统参数与智能合约配置。</p>
           </div>
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">系统配置</h2>
-          <p className="text-zinc-400 text-sm">管理系统参数与智能合约配置。</p>
+          <ActionButton
+            onClick={fetchConfigs}
+            loading={loading}
+            variant="secondary"
+          >
+            <RefreshCw size={20} />
+          </ActionButton>
         </div>
-        <button onClick={fetchConfigs} className="p-2 text-zinc-500 hover:text-white transition-colors">
-          <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-        </button>
-      </div>
 
-      {loading ? (
-        <div className="space-y-8 animate-pulse">
-           <div className="h-40 bg-zinc-900 rounded-xl" />
-           <div className="h-40 bg-zinc-900 rounded-xl" />
-        </div>
-      ) : (
+        {loading ? (
+          <Loading type="skeleton" />
+        ) : (
         <>
           <ConfigSection title="核心合约配置" icon={Cpu} items={technicalConfigs} />
           {businessConfigs.length > 0 && <ConfigSection title="财务配置" icon={Wallet} items={businessConfigs} />}
@@ -260,6 +234,7 @@ const SystemConfigPage: React.FC = () => {
         </p>
       </div>
     </div>
+    </>
   );
 };
 

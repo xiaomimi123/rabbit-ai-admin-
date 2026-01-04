@@ -1,19 +1,22 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-// Added RefreshCw to imports
-import { Search, Filter, ArrowUpRight, ArrowDownLeft, ExternalLink, Calendar, CheckCircle2, Clock, XCircle, Copy, RefreshCw } from 'lucide-react';
+import { Search, ArrowUpRight, ArrowDownLeft, ExternalLink, Calendar, CheckCircle2, Clock, XCircle, Copy, RefreshCw } from 'lucide-react';
 import { getAdminOperationRecords } from '../lib/api';
 import { OperationRecord } from '../types';
+import { useAutoRefresh } from '../hooks';
+import { TableSkeleton, EmptyState, ActionButton, useNotifications, NotificationContainer } from '../components';
+import { paginateData } from '../utils/pagination';
 
 const OperationRecords: React.FC = () => {
+  const { notifications, showNotification, removeNotification } = useNotifications();
   const [records, setRecords] = useState<OperationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'Withdrawal' | 'AirdropClaim'>('all');
 
-  useEffect(() => {
-    fetchRecords();
-  }, [typeFilter]);
+  // 🟢 优化：客户端分页
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -24,12 +27,28 @@ const OperationRecords: React.FC = () => {
         type: typeFilter === 'all' ? undefined : typeFilter,
       });
       setRecords(data.items);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification('error', `获取操作记录失败: ${e?.message || '未知错误'}`);
     } finally {
       setLoading(false);
     }
   };
+
+  // 🟢 优化：使用 useAutoRefresh Hook
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: true,
+    interval: 30000, // 30秒刷新一次
+    onRefresh: fetchRecords,
+  });
+
+  useEffect(() => {
+    fetchRecords();
+  }, [typeFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1); // 筛选时重置到第一页
+  }, [typeFilter, searchTerm]);
 
   const filteredRecords = useMemo(() => {
     return records.filter(rec => {
@@ -38,6 +57,23 @@ const OperationRecords: React.FC = () => {
       return matchSearch && matchType;
     });
   }, [records, searchTerm, typeFilter]);
+
+  // 🟢 优化：客户端分页
+  const { paginatedData, totalPages } = useMemo(() => {
+    return paginateData(filteredRecords, currentPage, itemsPerPage);
+  }, [filteredRecords, currentPage]);
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(p => p + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(p => p - 1);
+    }
+  };
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
@@ -51,21 +87,27 @@ const OperationRecords: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">操作记录</h2>
-          <p className="text-zinc-400 text-sm">审计全量用户的提现与空投领取流水。</p>
+    <>
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      <div className="space-y-6 flex flex-col h-full">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">操作记录</h2>
+            <p className="text-zinc-400 text-sm">审计全量用户的提现与空投领取流水。</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ActionButton
+              onClick={fetchRecords}
+              loading={loading || isRefreshing}
+              variant="secondary"
+            >
+              <RefreshCw size={18} />
+            </ActionButton>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={fetchRecords}
-            className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
-          >
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-          </button>
-        </div>
-      </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative group flex-1">
@@ -106,10 +148,10 @@ const OperationRecords: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
               {loading ? (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-zinc-500 animate-pulse">正在同步审计记录...</td></tr>
-              ) : filteredRecords.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-zinc-500">暂无相关操作记录。</td></tr>
-              ) : filteredRecords.map((rec) => (
+                <tr><td colSpan={6} className="px-6 py-20"><TableSkeleton rows={5} cols={6} /></td></tr>
+              ) : paginatedData.length === 0 ? (
+                <tr><td colSpan={6} className="px-6 py-20"><EmptyState variant="database" title="暂无操作记录" description="当前筛选条件下没有找到操作记录" /></td></tr>
+              ) : paginatedData.map((rec) => (
                 <tr key={rec.id} className="hover:bg-zinc-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="space-y-1">
@@ -169,7 +211,36 @@ const OperationRecords: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* 🟢 优化：分页控件 */}
+      {!loading && filteredRecords.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+          <div className="text-xs text-zinc-500">
+            显示第 {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} 条，共 {filteredRecords.length} 条
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={prevPage}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-xs font-medium bg-zinc-800 border border-zinc-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+            >
+              上一页
+            </button>
+            <span className="text-xs text-zinc-400 font-medium">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={nextPage}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-xs font-medium bg-zinc-800 border border-zinc-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+    </>
   );
 };
 

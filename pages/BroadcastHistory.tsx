@@ -5,12 +5,12 @@ import {
   Clock, 
   Users, 
   RefreshCw,
-  X,
-  AlertCircle,
-  CheckCircle2
+  X
 } from 'lucide-react';
 import { getBroadcastHistory, broadcastNotification } from '../lib/api';
 import { useNotifications, NotificationContainer } from '../components/Notification';
+import { useAutoRefresh } from '../hooks';
+import { Loading, EmptyState, ActionButton } from '../components';
 
 interface BroadcastRecord {
   id: string;
@@ -41,6 +41,13 @@ const BroadcastHistoryPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // 🟢 优化：使用 useAutoRefresh Hook
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: true,
+    interval: 30000, // 30秒刷新一次
+    onRefresh: fetchHistory,
+  });
 
   useEffect(() => {
     fetchHistory();
@@ -99,12 +106,11 @@ const BroadcastHistoryPage: React.FC = () => {
       <div className="flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <RefreshCw className="animate-spin text-zinc-500" size={24} />
+            <Loading type="spinner" message="加载中..." />
           </div>
         ) : history.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-zinc-500">
-            <Megaphone size={48} className="mb-4 opacity-50" />
-            <p className="text-sm">暂无广播记录</p>
+          <div className="flex items-center justify-center h-64">
+            <EmptyState variant="database" title="暂无广播记录" description="还没有发送过广播通知" />
           </div>
         ) : (
           <div className="overflow-y-auto h-full">
@@ -197,14 +203,16 @@ const BroadcastHistoryPage: React.FC = () => {
                 >
                   取消
                 </button>
-                <button 
+                <ActionButton
                   onClick={handleBroadcast}
-                  disabled={!broadcastTitle || !broadcastContent || isSendingBroadcast}
-                  className="flex-[2] py-3 bg-indigo-500 hover:bg-indigo-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center justify-center gap-2 transition-all"
+                  disabled={!broadcastTitle || !broadcastContent}
+                  loading={isSendingBroadcast}
+                  variant="primary"
+                  className="flex-[2]"
                 >
-                  {isSendingBroadcast ? <RefreshCw className="animate-spin" size={16} /> : <Megaphone size={16} />}
+                  <Megaphone size={16} />
                   发送广播
-                </button>
+                </ActionButton>
               </div>
             </div>
           </div>

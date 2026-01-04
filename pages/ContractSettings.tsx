@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, Wallet, AlertCircle, CheckCircle2, XCircle, Settings, Coins, Target } from 'lucide-react';
+import { Save, RefreshCw, Wallet, CheckCircle2, XCircle, Settings, Coins, Target, AlertCircle } from 'lucide-react';
 import { connectWallet, getConnectedAddress, checkMetaMask } from '../utils/web3';
 import { ethers } from 'ethers';
 import { getAdminKPIs } from '../lib/api';
+import { useNotifications, NotificationContainer } from '../components/Notification';
+import { Loading, ActionButton } from '../components';
 
 // 智能合约 ABI（只包含需要的函数）
 const AIRDROP_ABI = [
@@ -21,12 +23,6 @@ const BSC_CHAIN_ID = 56;
 // 合约地址（可以从后端 API 获取，这里使用默认值）
 // 实际使用时可以从后端 API 的 KPI 接口获取 airdrop.contract 字段
 const DEFAULT_AIRDROP_CONTRACT = '0x16B7a2e6eD9a0Ace9495b80eF0A5D0e3f72aCD7c';
-
-interface Notification {
-  id: string;
-  type: 'success' | 'error';
-  message: string;
-}
 
 const ContractSettingsPage: React.FC = () => {
   const [contractAddress, setContractAddress] = useState<string>(DEFAULT_AIRDROP_CONTRACT);
@@ -49,16 +45,9 @@ const ContractSettingsPage: React.FC = () => {
   // 交易状态
   const [isSaving, setIsSaving] = useState(false);
   const [savingType, setSavingType] = useState<'fee' | 'range' | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-
-  // 显示通知
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    const id = Date.now().toString();
-    setNotifications(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 5000);
-  };
+  
+  // 🟢 优化：使用统一的 useNotifications Hook
+  const { notifications, showNotification, removeNotification } = useNotifications();
 
   // 连接钱包
   const handleConnectWallet = async () => {
@@ -286,32 +275,16 @@ const ContractSettingsPage: React.FC = () => {
   }, [contractAddress]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">智能合约设置</h2>
-        <p className="text-zinc-400 text-sm">管理空投合约的奖励范围和服务费配置（需要合约所有者权限）</p>
-      </div>
-
-      {/* 通知 */}
-      <div className="fixed top-20 right-6 z-50 space-y-2">
-        {notifications.map((notif) => (
-          <div
-            key={notif.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-md transition-all ${
-              notif.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                : 'bg-red-500/10 border-red-500/20 text-red-400'
-            }`}
-          >
-            {notif.type === 'success' ? (
-              <CheckCircle2 size={20} />
-            ) : (
-              <XCircle size={20} />
-            )}
-            <span className="text-sm font-medium">{notif.message}</span>
-          </div>
-        ))}
-      </div>
+    <>
+      <NotificationContainer 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-white">智能合约设置</h2>
+          <p className="text-zinc-400 text-sm">管理空投合约的奖励范围和服务费配置（需要合约所有者权限）</p>
+        </div>
 
       {/* 钱包连接卡片 */}
       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
@@ -369,18 +342,20 @@ const ContractSettingsPage: React.FC = () => {
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-white">当前配置</h3>
-            <button
+            <ActionButton
               onClick={handleRefresh}
-              disabled={loadingConfig}
-              className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-all disabled:opacity-50"
+              loading={loadingConfig}
+              variant="secondary"
             >
-              <RefreshCw size={16} className={loadingConfig ? 'animate-spin' : ''} />
+              <RefreshCw size={16} />
               刷新
-            </button>
+            </ActionButton>
           </div>
 
           {loadingConfig ? (
-            <div className="text-center py-8 text-zinc-500">加载中...</div>
+            <div className="text-center py-8">
+              <Loading type="spinner" message="加载中..." />
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
@@ -528,7 +503,8 @@ const ContractSettingsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

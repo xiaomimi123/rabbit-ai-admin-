@@ -5,14 +5,14 @@ import {
   Plus, 
   Trash2, 
   RefreshCw, 
-  AlertCircle, 
   Info,
   Gem,
-  ArrowRight
+  AlertCircle
 } from 'lucide-react';
 import { getVipTiers, updateVipTier } from '../lib/api';
 import { YieldTier } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
+import { Loading, EmptyState, ActionButton } from '../components';
 
 const YieldStrategy: React.FC = () => {
   const [tiers, setTiers] = useState<YieldTier[]>([]);
@@ -36,8 +36,9 @@ const YieldStrategy: React.FC = () => {
         min_hold: parseFloat(tier.minBalance),
         daily_rate: tier.dailyRate * 100, // 后端存的是小数，前端显示百分比
       })));
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取策略失败', error);
+      showNotification('error', `获取策略失败: ${error?.message || '未知错误'}`);
     } finally {
       setLoading(false);
     }
@@ -110,20 +111,22 @@ const YieldStrategy: React.FC = () => {
           <p className="text-zinc-400 text-sm">动态调整 "Hold-to-Earn" 模式下的持币门槛与收益率。</p>
         </div>
         <div className="flex items-center gap-3">
-          <button 
+          <ActionButton
             onClick={fetchTiers}
-            className="p-2.5 text-zinc-500 hover:text-white bg-zinc-900 border border-zinc-800 rounded-xl transition-all"
+            loading={loading}
+            variant="secondary"
           >
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <button 
+            <RefreshCw size={20} />
+          </ActionButton>
+          <ActionButton
             onClick={handleSave}
-            disabled={saving || loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-sm rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+            loading={saving}
+            disabled={loading}
+            variant="primary"
           >
-            {saving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+            <Save size={18} />
             保存配置 (Save Changes)
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -153,11 +156,9 @@ const YieldStrategy: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-20 bg-zinc-900/50 border border-zinc-800 rounded-2xl animate-pulse" />
-            ))}
-          </div>
+          <Loading type="skeleton" />
+        ) : tiers.length === 0 ? (
+          <EmptyState variant="database" title="暂无收益等级" description="请添加收益等级配置" />
         ) : (
           <>
             <div className="space-y-3">

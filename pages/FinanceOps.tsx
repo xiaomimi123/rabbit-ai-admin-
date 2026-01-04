@@ -6,6 +6,7 @@ import { Withdrawal } from '../types';
 import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT } from '../utils/web3';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 import { useConfirmDialog, ConfirmDialog } from '../components/ConfirmDialog';
+import { Loading, EmptyState, ActionButton } from '../components';
 
 const FinanceOps: React.FC = () => {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -358,24 +359,16 @@ const FinanceOps: React.FC = () => {
               </button>
             </>
           ) : (
-            <button
+            <ActionButton
               onClick={handleConnectWallet}
-              disabled={connectingWallet || !checkMetaMask()}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center gap-2 transition-all"
+              disabled={!checkMetaMask()}
+              loading={connectingWallet}
+              variant="primary"
               title="连接 MetaMask 钱包以便手动发放提现"
             >
-              {connectingWallet ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  连接中...
-                </>
-              ) : (
-                <>
-                  <Wallet size={18} />
-                  连接出款钱包
-                </>
-              )}
-            </button>
+              <Wallet size={18} />
+              连接出款钱包
+            </ActionButton>
           )}
         </div>
       </div>
@@ -388,11 +381,12 @@ const FinanceOps: React.FC = () => {
         
         <div className="divide-y divide-zinc-800">
           {loading ? (
-            <div className="p-12 text-center text-zinc-500 animate-pulse">正在获取待审批请求...</div>
+            <div className="p-12">
+              <Loading type="spinner" message="正在获取待审批请求..." />
+            </div>
           ) : withdrawals.length === 0 ? (
-            <div className="p-12 text-center text-zinc-500">
-              <CheckCircle2 size={40} className="mx-auto mb-3 opacity-20" />
-              <p>全部处理完毕！目前没有待审批的提现。</p>
+            <div className="p-12">
+              <EmptyState variant="database" title="全部处理完毕" description="目前没有待审批的提现" />
             </div>
           ) : withdrawals.map(w => (
             <div key={w.id} className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-800/20 transition-colors">
@@ -413,42 +407,37 @@ const FinanceOps: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <button 
+                <ActionButton
                   onClick={() => handleReject(w.id)}
                   disabled={processingId === w.id}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-lg text-sm font-bold transition-all disabled:opacity-50"
+                  variant="danger"
+                  className="flex-1 sm:flex-none"
                 >
                   拒绝
-                </button>
+                </ActionButton>
                 {walletConnected ? (
-                  <button 
+                  <ActionButton
                     onClick={() => handleRelease(w)}
-                    disabled={processingId === w.id || !usdtContractInfo}
-                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 rounded-lg text-sm font-black transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    disabled={!usdtContractInfo}
+                    loading={processingId === w.id}
+                    variant="primary"
+                    className="flex-1 sm:flex-none"
                   >
-                    {processingId === w.id ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        发放中...
-                      </>
-                    ) : (
-                      <>
-                        <Send size={16} />
-                        发放 (Release)
-                      </>
-                    )}
-                  </button>
+                    <Send size={16} />
+                    发放 (Release)
+                  </ActionButton>
                 ) : (
-                  <button 
+                  <ActionButton
                     onClick={() => {
                       setActiveWithdrawal(w);
                       setIsApproveOpen(true);
                     }}
                     disabled={processingId === w.id}
-                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-400 rounded-lg text-sm font-black transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                    variant="primary"
+                    className="flex-1 sm:flex-none"
                   >
                     批准提现
-                  </button>
+                  </ActionButton>
                 )}
               </div>
             </div>
