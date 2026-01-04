@@ -16,14 +16,8 @@ const Dashboard: React.FC = () => {
     let usersTotal = 0;
     
     try {
-      // 🟢 优化：同时获取 KPI 数据和 RAT 持币大户（都从数据库读取，速度快）
-      const [data, holders] = await Promise.all([
-        getAdminKPIs(),
-        getTopRATHolders(5).catch(() => ({ ok: true, items: [] })), // 如果失败，返回空数组
-      ]);
-      
-      console.log('[Dashboard] KPI 数据:', data); // 🟢 调试日志
-      console.log('[Dashboard] RAT 持币大户:', holders); // 🟢 调试日志
+      // 🟢 优化：先加载基础 KPI 数据（快速显示），持币大户排行异步加载
+      const data = await getAdminKPIs();
       
       // 转换后端数据格式为前端格式
       const totalRAT = data.totalHoldings ? parseFloat(data.totalHoldings.amount) : 0;
@@ -31,8 +25,6 @@ const Dashboard: React.FC = () => {
       
       // 🟢 修复：确保 usersTotal 正确解析
       usersTotal = typeof data.usersTotal === 'number' ? data.usersTotal : (typeof data.usersTotal === 'string' ? parseInt(data.usersTotal, 10) : 0);
-      
-      console.log('[Dashboard] 解析后的 usersTotal:', usersTotal); // 🟢 调试日志
       
       // 暂时移除趋势数据（需要历史数据支持，后续可以实现）
       const mockData: KPIResponse = {
@@ -48,10 +40,18 @@ const Dashboard: React.FC = () => {
         }
       };
       
-      console.log('[Dashboard] 最终 KPI 数据:', mockData); // 🟢 调试日志
-      
+      // 🟢 优化：先设置基础 KPI，立即显示
       setKpis(mockData);
-      setTopHolders(holders.items || []);
+      
+      // 🟢 优化：持币大户排行异步加载（不影响主数据展示）
+      getTopRATHolders(5)
+        .then(holders => {
+          setTopHolders(holders.items || []);
+        })
+        .catch(() => {
+          // 失败时设置为空数组，不影响主数据
+          setTopHolders([]);
+        });
     } catch (error: any) {
       console.error('获取 KPI 失败', error);
       showNotification('error', `获取 KPI 失败: ${error?.message || '未知错误'}`);
@@ -87,7 +87,13 @@ const Dashboard: React.FC = () => {
     enabled: true,
     interval: 15000,
     onRefresh: fetchKPIs,
+    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
   });
+
+  // 🟢 修复：添加初始加载逻辑
+  useEffect(() => {
+    fetchKPIs();
+  }, [fetchKPIs]);
 
   if (loading && !kpis) {
     return (
