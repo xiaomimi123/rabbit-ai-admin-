@@ -96,7 +96,7 @@ const AnalyticsPage: React.FC = () => {
       setLoadingVisits(false);
       setIsInitialLoadVisits(false); // 🟢 标记初始加载完成
     }
-  }, [pagination, selectedCountry, startDate, endDate, showNotification]);
+  }, [pagination.pageSize, pagination.offset, pagination.setTotal, selectedCountry, startDate, endDate, showNotification]); // 🟢 修复：只依赖 pagination 的特定属性
 
   // 🟢 新增：获取数据统计
   const fetchStats = useCallback(async () => {
@@ -164,14 +164,15 @@ const AnalyticsPage: React.FC = () => {
 
   useEffect(() => {
     handleRefresh(false); // 初始加载
-  }, []); // 只在组件挂载时加载一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 🟢 只在组件挂载时加载一次（故意忽略 handleRefresh 依赖，避免无限循环）
 
-  // 🟢 修复：当筛选条件或分页变化时，重新加载访问记录
+  // 🟢 修复：当筛选条件变化时，重新加载访问记录
   useEffect(() => {
     // 筛选条件变化时，重置为初始加载状态
     setIsInitialLoadVisits(true);
     fetchVisits(false); // 筛选条件变化时，显示骨架屏
-  }, [selectedCountry, startDate, endDate]); // 🟢 移除 pagination.page 依赖，避免重复触发
+  }, [selectedCountry, startDate, endDate, fetchVisits]); // 🟢 修复：添加 fetchVisits 依赖
 
   // 🟢 新增：分页变化时，不显示骨架屏（只刷新数据）
   useEffect(() => {
@@ -179,7 +180,7 @@ const AnalyticsPage: React.FC = () => {
       // 只有在非初始加载状态下，分页变化才不显示骨架屏
       fetchVisits(true);
     }
-  }, [pagination.page]); // 🟢 只在分页变化时触发
+  }, [pagination.page, isInitialLoadVisits, fetchVisits]); // 🟢 修复：添加缺失的依赖
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
