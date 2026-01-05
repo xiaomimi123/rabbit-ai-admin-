@@ -84,6 +84,23 @@ const OperationRecords: React.FC = () => {
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
+  // 🟢 修复：时间格式化函数
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      return new Date(timestamp).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch (e) {
+      console.warn('[formatTimestamp] Failed to parse timestamp:', timestamp, e);
+      return timestamp; // 如果解析失败，返回原始字符串
+    }
+  };
+
   const StatusBadge = ({ status }: { status: string }) => {
     switch (status) {
       case 'Success': return <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"><CheckCircle2 size={10} /> 成功</span>;
@@ -165,7 +182,7 @@ const OperationRecords: React.FC = () => {
                       <p className="text-xs font-mono font-bold text-zinc-400">{rec.id}</p>
                       <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
                         <Calendar size={10} />
-                        {rec.timestamp}
+                        {formatTimestamp(rec.timestamp)}
                       </div>
                     </div>
                   </td>
