@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   WalletMinimal, 
   Download, 
@@ -30,7 +30,7 @@ const WithdrawalExpenses: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0); // 🟢 新增：总记录数
   const itemsPerPage = 20;
 
-  // 🟢 修复：使用 useCallback 稳定函数引用
+  // 🟢 修复：使用 useCallback 稳定函数引用，移除 showNotification 依赖避免无限循环
   const fetchExpenses = useCallback(async (isRefresh = false) => {
     // 🟢 修复：只在初始加载时显示骨架屏，刷新时不显示
     if (!isRefresh) {
@@ -67,32 +67,48 @@ const WithdrawalExpenses: React.FC = () => {
       })));
       setTotalCount(data.totalCount || 0); // 🟢 新增：保存总记录数
     } catch (e: any) {
-      console.error(e);
-      showNotification('error', `获取支出记录失败: ${e?.message || '未知错误'}`);
+      console.error('[fetchExpenses] Error:', e);
+      // 🟢 修复：使用稳定的 showNotification 引用
+      const errorMessage = e?.message || '未知错误';
+      if (errorMessage.includes('Failed to fetch')) {
+        showNotification('error', `获取支出记录失败: 网络连接错误，请检查后端服务是否正常运行`);
+      } else {
+        showNotification('error', `获取支出记录失败: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
       setIsInitialLoad(false); // 🟢 修复：标记初始加载完成
     }
-  }, [currentPage, dateRange, itemsPerPage, showNotification]);
+  }, [currentPage, dateRange, itemsPerPage]); // 🟢 修复：移除 showNotification 依赖
 
-  // 🟢 优化：使用 useAutoRefresh Hook
-  const { refresh, isRefreshing } = useAutoRefresh({
-    enabled: true,
-    interval: 30000, // 30秒刷新一次
-    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
-    onRefresh: () => fetchExpenses(true), // 🟢 修复：传递 isRefresh=true，不显示骨架屏
-  });
-
-  // 🟢 修复：日期范围变化时，重置到第一页并重新获取数据
+  // 🟢 修复：日期范围变化时，重置到第一页
   useEffect(() => {
     setIsInitialLoad(true);
     setCurrentPage(1);
   }, [dateRange]);
 
-  // 🟢 修复：页码或日期范围变化时重新获取数据
+  // 🟢 修复：页码或日期范围变化时重新获取数据（避免依赖 fetchExpenses 导致无限循环）
   useEffect(() => {
     fetchExpenses(false);
-  }, [currentPage, dateRange, fetchExpenses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, dateRange]); // 🟢 修复：只依赖 currentPage 和 dateRange
+
+  // 🟢 优化：使用 useAutoRefresh Hook（使用 ref 保存最新的 fetchExpenses，避免频繁重新设置定时器）
+  const fetchExpensesRef = useRef(fetchExpenses);
+  useEffect(() => {
+    fetchExpensesRef.current = fetchExpenses;
+  }, [fetchExpenses]);
+
+  const refreshCallback = useCallback(() => {
+    fetchExpensesRef.current(true); // 🟢 使用 ref 调用，避免依赖变化
+  }, []); // 🟢 空依赖数组，函数引用稳定
+
+  const { refresh, isRefreshing } = useAutoRefresh({
+    enabled: true,
+    interval: 30000, // 30秒刷新一次
+    immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
+    onRefresh: refreshCallback, // 🟢 修复：使用稳定的回调函数
+  });
 
   useEffect(() => {
     setCurrentPage(1); // 搜索时重置到第一页
