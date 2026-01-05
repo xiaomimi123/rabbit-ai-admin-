@@ -475,7 +475,13 @@ const UsersPage: React.FC = () => {
                 </div>
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">可提现 USDT</p>
-                  <p className="text-3xl font-black text-blue-400">${selectedUser.usdtBalance.toFixed(6)}</p>
+                  {/* 🟢 修复：显示实时计算的收益（pendingUsdt），而不是 usdt_total */}
+                  {/* usdtBalance 已在 fetchUserDetails 中通过 getUserEarnings API 更新为实时计算的 pendingUsdt */}
+                  <p className="text-3xl font-black text-blue-400">
+                    ${selectedUser.usdtBalance !== undefined && selectedUser.usdtBalance !== null 
+                      ? selectedUser.usdtBalance.toFixed(6) 
+                      : '0.000000'}
+                  </p>
                 </div>
               </div>
 
