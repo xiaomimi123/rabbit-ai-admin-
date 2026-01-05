@@ -23,26 +23,13 @@ const TeamHierarchy: React.FC = () => {
   const pagination = usePagination({ pageSize: 50 }); // 🟢 使用分页 Hook，每页 50 条
   const currentAddressRef = useRef<string>(''); // 🟢 记录当前查询的地址
 
-  const handleSearch = useCallback(async (isPageChange = false) => {
-    const address = searchAddress.trim().toLowerCase();
-    if (!address || !address.startsWith('0x') || address.length !== 42) {
-      if (!isPageChange) {
-        showNotification('error', '请输入有效的钱包地址（0x开头，42字符）');
-      }
-      return;
-    }
-
-    // 🟢 如果是地址变化，重置分页到第一页
-    if (!isPageChange && currentAddressRef.current !== address) {
-      pagination.reset();
-      currentAddressRef.current = address;
-    }
-
+  // 🟢 修复：分离查询逻辑，避免依赖项问题
+  const fetchTeamData = useCallback(async (address: string, limit: number, offset: number, isPageChange = false) => {
     setLoading(true);
     try {
       const data = await getUserTeam(address, {
-        limit: pagination.pageSize,
-        offset: pagination.offset,
+        limit,
+        offset,
       });
       if (data.ok) {
         setTarget(data.target);
@@ -70,14 +57,41 @@ const TeamHierarchy: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchAddress, pagination.pageSize, pagination.offset, pagination.setTotal, pagination.reset, showNotification]);
+  }, [pagination, showNotification]);
+
+  const handleSearch = useCallback(async () => {
+    const address = searchAddress.trim().toLowerCase();
+    if (!address || !address.startsWith('0x') || address.length !== 42) {
+      showNotification('error', '请输入有效的钱包地址（0x开头，42字符）');
+      return;
+    }
+
+    // 🟢 如果是地址变化，重置分页到第一页
+    if (currentAddressRef.current !== address) {
+      pagination.reset();
+      currentAddressRef.current = address;
+    }
+
+    // 使用第一页的数据（offset = 0）
+    await fetchTeamData(address, pagination.pageSize, 0, false);
+  }, [searchAddress, pagination, fetchTeamData, showNotification]);
 
   // 🟢 分页变化时重新加载数据
   useEffect(() => {
-    if (currentAddressRef.current) {
-      handleSearch(true); // 传递 isPageChange=true，不显示成功提示
+    const address = currentAddressRef.current;
+    if (address) {
+      // 计算当前页的 offset
+      const offset = (pagination.page - 1) * pagination.pageSize;
+      // 使用最新的 offset 和 pageSize
+      fetchTeamData(
+        address,
+        pagination.pageSize,
+        offset,
+        true // 分页变化，不显示成功提示
+      );
     }
-  }, [pagination.page, handleSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.pageSize]); // 🟢 依赖 page 和 pageSize
 
   const copyAddress = (address: string) => {
     navigator.clipboard.writeText(address);
