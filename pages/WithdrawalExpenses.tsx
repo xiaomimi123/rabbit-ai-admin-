@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   WalletMinimal, 
   Download, 
@@ -16,7 +16,6 @@ import { Withdrawal } from '../types';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 import { useAutoRefresh } from '../hooks';
 import { TableSkeleton, EmptyState, ActionButton } from '../components';
-import { paginateData } from '../utils/pagination';
 
 const WithdrawalExpenses: React.FC = () => {
   const [records, setRecords] = useState<Withdrawal[]>([]);
@@ -26,11 +25,13 @@ const WithdrawalExpenses: React.FC = () => {
   const [dateRange, setDateRange] = useState('7d');
   const { notifications, showNotification, removeNotification } = useNotifications();
 
-  // 🟢 优化：客户端分页
+  // 🟢 修复：服务端分页
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0); // 🟢 新增：总记录数
   const itemsPerPage = 20;
 
-  const fetchExpenses = async (isRefresh = false) => {
+  // 🟢 修复：使用 useCallback 稳定函数引用
+  const fetchExpenses = useCallback(async (isRefresh = false) => {
     // 🟢 修复：只在初始加载时显示骨架屏，刷新时不显示
     if (!isRefresh) {
       setLoading(true);
@@ -47,9 +48,12 @@ const WithdrawalExpenses: React.FC = () => {
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
+      // 🟢 修复：根据当前页码计算 offset，实现服务端分页
+      const offset = (currentPage - 1) * itemsPerPage;
+
       const data = await getAdminExpenses({
-        limit: 100,
-        offset: 0,
+        limit: itemsPerPage, // 🟢 修复：使用每页条数
+        offset: offset,      // 🟢 修复：动态计算 offset
         startDate,
         endDate: dateRange !== 'all' ? now.toISOString() : undefined,
       });
@@ -61,6 +65,7 @@ const WithdrawalExpenses: React.FC = () => {
         status: item.status as 'Pending' | 'Completed' | 'Rejected',
         createdAt: new Date(item.createdAt).toLocaleString(),
       })));
+      setTotalCount(data.totalCount || 0); // 🟢 新增：保存总记录数
     } catch (e: any) {
       console.error(e);
       showNotification('error', `获取支出记录失败: ${e?.message || '未知错误'}`);
@@ -68,7 +73,7 @@ const WithdrawalExpenses: React.FC = () => {
       setLoading(false);
       setIsInitialLoad(false); // 🟢 修复：标记初始加载完成
     }
-  };
+  }, [currentPage, dateRange, itemsPerPage, showNotification]);
 
   // 🟢 优化：使用 useAutoRefresh Hook
   const { refresh, isRefreshing } = useAutoRefresh({
@@ -78,27 +83,35 @@ const WithdrawalExpenses: React.FC = () => {
     onRefresh: () => fetchExpenses(true), // 🟢 修复：传递 isRefresh=true，不显示骨架屏
   });
 
+  // 🟢 修复：日期范围变化时，重置到第一页并重新获取数据
   useEffect(() => {
-    setIsInitialLoad(true); // 🟢 修复：日期范围变化时，重新标记为初始加载
-    fetchExpenses(false);
+    setIsInitialLoad(true);
+    setCurrentPage(1);
   }, [dateRange]);
 
+  // 🟢 修复：页码或日期范围变化时重新获取数据
   useEffect(() => {
-    setCurrentPage(1); // 筛选时重置到第一页
-  }, [dateRange, searchTerm]);
+    fetchExpenses(false);
+  }, [currentPage, dateRange, fetchExpenses]);
+
+  useEffect(() => {
+    setCurrentPage(1); // 搜索时重置到第一页
+  }, [searchTerm]);
 
   const totalSpent = useMemo(() => {
     return records.reduce((acc, curr) => acc + curr.amount, 0).toFixed(2);
   }, [records]);
 
+  // 🟢 修复：客户端搜索（基于当前页数据）
   const filteredRecords = useMemo(() => {
+    if (!searchTerm) return records;
     return records.filter(r => r.address.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [records, searchTerm]);
 
-  // 🟢 优化：客户端分页
-  const { paginatedData, totalPages } = useMemo(() => {
-    return paginateData(filteredRecords, currentPage, itemsPerPage);
-  }, [filteredRecords, currentPage]);
+  // 🟢 修复：计算总页数（基于总记录数）
+  const totalPages = useMemo(() => {
+    return Math.ceil(totalCount / itemsPerPage);
+  }, [totalCount, itemsPerPage]);
 
   const nextPage = () => {
     if (currentPage < totalPages) {
@@ -206,9 +219,9 @@ const WithdrawalExpenses: React.FC = () => {
             <tbody className="divide-y divide-zinc-800/50">
               {loading && isInitialLoad ? (
                 <tr><td colSpan={5} className="px-6 py-20"><TableSkeleton rows={5} cols={5} /></td></tr>
-              ) : paginatedData.length === 0 ? (
+              ) : filteredRecords.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-20"><EmptyState variant="database" title="暂无支出记录" description="当前筛选条件下没有找到支出记录" /></td></tr>
-              ) : paginatedData.map((rec) => (
+              ) : filteredRecords.map((rec) => (
                 <tr key={rec.id} className="hover:bg-zinc-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-zinc-400">
@@ -243,11 +256,11 @@ const WithdrawalExpenses: React.FC = () => {
           </table>
         </div>
 
-        {/* 🟢 优化：分页控件 */}
-        {!loading && filteredRecords.length > 0 && totalPages > 1 && (
+        {/* 🟢 修复：分页控件（基于总记录数） */}
+        {!loading && totalCount > 0 && totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
             <div className="text-xs text-zinc-500">
-              显示第 {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} 条，共 {filteredRecords.length} 条
+              显示第 {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalCount)} 条，共 {totalCount} 条
             </div>
             <div className="flex items-center gap-2">
               <button

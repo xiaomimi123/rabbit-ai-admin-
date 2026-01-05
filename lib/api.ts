@@ -159,7 +159,8 @@ export async function getAdminExpenses(params: {
       createdAt: string;
       payoutTxHash: string | null;
     }>;
-    total: number;
+    total: number; // 总支出金额
+    totalCount: number; // 🟢 新增：总记录数
   }>(`/admin/expenses?${query.toString()}`);
 }
 
