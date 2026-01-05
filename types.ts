@@ -61,11 +61,13 @@ export interface Message {
 export interface OperationRecord {
   id: string;
   address: string;
-  type: 'Withdrawal' | 'AirdropClaim';
+  type: 'Withdrawal' | 'AirdropClaim' | 'AddUSDT' | 'DeductUSDT' | 'AddEnergy' | 'DeductEnergy';
   amount: string;
   status: 'Success' | 'Pending' | 'Failed' | 'Rejected';
   timestamp: string;
   txHash?: string;
+  amountBefore?: string;
+  amountAfter?: string;
 }
 
 export interface SystemConfig {

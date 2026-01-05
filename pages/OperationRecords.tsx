@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ArrowUpRight, ArrowDownLeft, ExternalLink, Calendar, CheckCircle2, Clock, XCircle, Copy, RefreshCw } from 'lucide-react';
+import { Search, ArrowUpRight, ArrowDownLeft, ExternalLink, Calendar, CheckCircle2, Clock, XCircle, Copy, RefreshCw, Plus, Minus } from 'lucide-react';
 import { getAdminOperationRecords } from '../lib/api';
 import { OperationRecord } from '../types';
 import { useAutoRefresh } from '../hooks';
@@ -13,7 +13,7 @@ const OperationRecords: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // 🟢 新增：区分初始加载和刷新
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'Withdrawal' | 'AirdropClaim'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'Withdrawal' | 'AirdropClaim' | 'AddUSDT' | 'DeductUSDT' | 'AddEnergy' | 'DeductEnergy'>('all');
 
   // 🟢 优化：客户端分页
   const [currentPage, setCurrentPage] = useState(1);
@@ -153,6 +153,10 @@ const OperationRecords: React.FC = () => {
             <option value="all">所有类型</option>
             <option value="Withdrawal">USDT 提现</option>
             <option value="AirdropClaim">空投领取</option>
+            <option value="AddUSDT">管理员赠送USDT</option>
+            <option value="DeductUSDT">管理员扣除USDT</option>
+            <option value="AddEnergy">管理员赠送能量值</option>
+            <option value="DeductEnergy">管理员扣除能量值</option>
           </select>
         </div>
       </div>
@@ -204,18 +208,51 @@ const OperationRecords: React.FC = () => {
                           <ArrowUpRight size={14} />
                           <span className="text-xs font-bold">USDT 提现</span>
                         </div>
-                      ) : (
+                      ) : rec.type === 'AirdropClaim' ? (
                         <div className="flex items-center gap-2 text-emerald-400">
                           <ArrowDownLeft size={14} />
                           <span className="text-xs font-bold">空投领取</span>
                         </div>
-                      )}
+                      ) : rec.type === 'AddUSDT' ? (
+                        <div className="flex items-center gap-2 text-blue-400">
+                          <Plus size={14} />
+                          <span className="text-xs font-bold">赠送USDT</span>
+                        </div>
+                      ) : rec.type === 'DeductUSDT' ? (
+                        <div className="flex items-center gap-2 text-orange-400">
+                          <Minus size={14} />
+                          <span className="text-xs font-bold">扣除USDT</span>
+                        </div>
+                      ) : rec.type === 'AddEnergy' ? (
+                        <div className="flex items-center gap-2 text-purple-400">
+                          <Plus size={14} />
+                          <span className="text-xs font-bold">赠送能量值</span>
+                        </div>
+                      ) : rec.type === 'DeductEnergy' ? (
+                        <div className="flex items-center gap-2 text-pink-400">
+                          <Minus size={14} />
+                          <span className="text-xs font-bold">扣除能量值</span>
+                        </div>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-sm font-black ${rec.type === 'Withdrawal' ? 'text-zinc-100' : 'text-emerald-500'}`}>
-                      {rec.amount}
-                    </span>
+                    <div className="space-y-0.5">
+                      <span className={`text-sm font-black ${
+                        rec.type === 'Withdrawal' ? 'text-zinc-100' : 
+                        rec.type === 'AirdropClaim' ? 'text-emerald-500' :
+                        rec.type === 'AddUSDT' || rec.type === 'AddEnergy' ? 'text-blue-500' :
+                        'text-orange-500'
+                      }`}>
+                        {rec.amount}
+                        {rec.type.includes('USDT') ? ' USDT' : rec.type.includes('Energy') ? ' 能量' : ''}
+                      </span>
+                      {rec.amountBefore !== undefined && rec.amountAfter !== undefined && (
+                        <div className="text-[10px] text-zinc-600">
+                          {rec.amountBefore} → {rec.amountAfter}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <StatusBadge status={rec.status} />
