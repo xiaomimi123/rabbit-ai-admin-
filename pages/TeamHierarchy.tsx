@@ -135,7 +135,7 @@ const TeamHierarchy: React.FC = () => {
           <span className="text-xs text-zinc-500">总能量</span>
           <div className="flex items-center gap-1">
             <Zap size={14} className="text-emerald-400" />
-            <span className="text-sm font-bold text-emerald-400">{member.energyTotal}</span>
+            <span className="text-sm font-bold text-emerald-400">{Math.floor(member.energyTotal)}</span>
           </div>
         </div>
         <div className="flex items-center justify-between">

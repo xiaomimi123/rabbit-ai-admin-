@@ -398,7 +398,7 @@ const UsersPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Gem size={12} className="text-emerald-500" />
                       <span className="text-sm font-black text-emerald-400">{user.ratBalance?.toLocaleString() || '0'}</span>
-                      <span className="text-[10px] text-zinc-600">/ {user.energyTotal} 能量值</span>
+                      <span className="text-[10px] text-zinc-600">/ {Math.floor(user.energyTotal)} 能量值</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-zinc-300">{user.inviteCount}</td>
@@ -471,7 +471,7 @@ const UsersPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">能量值</p>
-                  <p className="text-3xl font-black text-emerald-400">{selectedUser.energyTotal}</p>
+                  <p className="text-3xl font-black text-emerald-400">{Math.floor(selectedUser.energyTotal)}</p>
                 </div>
                 <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mb-1">可提现 USDT</p>
