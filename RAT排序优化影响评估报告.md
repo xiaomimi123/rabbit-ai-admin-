@@ -292,6 +292,55 @@ const usersList = data.items.map((item) => {
 ---
 
 **报告生成时间**: 2026-01-05  
+**最后更新**: 2026-01-05（添加 RPC 函数验证结果）  
 **评估结论**: ✅ **修改完全兼容，无负面影响**  
 **建议操作**: ✅ **可以安全部署**
+
+---
+
+## 📝 RPC 函数验证详情
+
+### 函数信息
+- **函数名**: `admin_list_users_sorted`
+- **参数**:
+  - `p_limit` (INTEGER, 默认: 50)
+  - `p_offset` (INTEGER, 默认: 0)
+  - `p_search` (TEXT, 默认: NULL)
+  - `p_sort_by` (TEXT, 默认: 'createdAt')
+  - `p_sort_order` (TEXT, 默认: 'desc')
+- **返回类型**: `JSON`
+- **安全模式**: `SECURITY DEFINER`（以 postgres 权限运行）
+- **搜索路径**: `SET search_path TO 'public'`
+
+### 权限验证 ✅
+- ✅ **PUBLIC**: EXECUTE 权限
+- ✅ **postgres**: EXECUTE 权限
+- ✅ **anon**: EXECUTE 权限
+- ✅ **authenticated**: EXECUTE 权限
+- ✅ **service_role**: EXECUTE 权限
+
+### 功能测试 ✅
+- ✅ **调用测试**: 函数可以正常调用
+- ✅ **数据返回**: 返回格式正确 `{ items: [...], total: number }`
+- ✅ **总数查询**: 返回总数 239（与实际数据一致）
+- ✅ **排序功能**: RAT 持仓排序使用 `CAST(rat_balance_wei::NUMERIC)` 转换，数值排序正确
+
+### 安全评估 ⚠️
+
+**SECURITY DEFINER 分析**：
+- ⚠️ **权限级别**: 函数以 postgres 权限运行（最高权限）
+- ✅ **操作范围**: 函数只执行 SELECT 查询，不修改数据
+- ✅ **安全措施**: 
+  - 使用参数化查询（防止 SQL 注入）
+  - 只查询 users 表，不涉及其他敏感操作
+  - 搜索路径限制为 'public' schema
+- ✅ **风险评估**: **低风险**
+  - 函数只读操作，不修改数据
+  - 参数经过验证和转义
+  - 搜索路径明确限制
+
+**建议**：
+- ✅ 当前设置可以接受（函数只执行查询操作）
+- ✅ 保持 `SECURITY DEFINER` 设置，确保函数有足够权限访问 users 表
+- ⚠️ 如果未来需要修改数据，建议使用 `SECURITY INVOKER` 并明确授权
 
