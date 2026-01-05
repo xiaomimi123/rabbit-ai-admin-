@@ -180,20 +180,25 @@ const AnalyticsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 🟢 只在组件挂载时加载一次（故意忽略 handleRefresh 依赖，避免无限循环）
 
-  // 🟢 修复：当筛选条件变化时，重新加载访问记录
+  // 🟢 修复：当筛选条件变化时，重新加载访问记录（不显示骨架屏，避免闪烁）
   useEffect(() => {
-    // 筛选条件变化时，重置为初始加载状态
-    setIsInitialLoadVisits(true);
-    fetchVisits(false); // 筛选条件变化时，显示骨架屏
-  }, [selectedCountry, startDate, endDate, fetchVisits]); // 🟢 修复：添加 fetchVisits 依赖
+    // 筛选条件变化时，不显示骨架屏，使用平滑过渡
+    // 只有在真正的初始加载（组件挂载时）才显示骨架屏
+    if (isInitialLoadVisits) {
+      // 初始加载时，由 handleRefresh 处理，这里不重复调用
+      return;
+    }
+    // 筛选条件变化时，不显示骨架屏，只更新数据
+    fetchVisits(true);
+  }, [selectedCountry, startDate, endDate, fetchVisits, isInitialLoadVisits]);
 
-  // 🟢 新增：分页变化时，不显示骨架屏（只刷新数据）
+  // 🟢 修复：分页变化时，不显示骨架屏（只刷新数据）
   useEffect(() => {
     if (!isInitialLoadVisits) {
       // 只有在非初始加载状态下，分页变化才不显示骨架屏
       fetchVisits(true);
     }
-  }, [pagination.page, isInitialLoadVisits, fetchVisits]); // 🟢 修复：添加缺失的依赖
+  }, [pagination.page, isInitialLoadVisits, fetchVisits]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -536,7 +541,7 @@ const AnalyticsPage: React.FC = () => {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className={`overflow-x-auto transition-opacity duration-300 ${loadingVisits ? 'opacity-50' : 'opacity-100'}`}>
               <table className="w-full">
                 <thead className="bg-zinc-800/50 border-b border-zinc-700">
                   <tr>
