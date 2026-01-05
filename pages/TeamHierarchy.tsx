@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Users, ArrowUp, ArrowDown, Copy, ExternalLink, Zap, UserPlus, Calendar } from 'lucide-react';
 import { getUserTeam } from '../lib/api';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 import { Loading, EmptyState, ActionButton } from '../components';
+import { usePagination } from '../hooks';
 
 interface TeamMember {
   address: string;
@@ -17,23 +18,41 @@ const TeamHierarchy: React.FC = () => {
   const [target, setTarget] = useState<TeamMember | null>(null);
   const [upline, setUpline] = useState<TeamMember | null>(null);
   const [downline, setDownline] = useState<TeamMember[]>([]);
+  const [totalDownline, setTotalDownline] = useState(0);
   const { notifications, showNotification, removeNotification } = useNotifications();
+  const pagination = usePagination({ pageSize: 50 }); // 🟢 使用分页 Hook，每页 50 条
+  const currentAddressRef = useRef<string>(''); // 🟢 记录当前查询的地址
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async (isPageChange = false) => {
     const address = searchAddress.trim().toLowerCase();
     if (!address || !address.startsWith('0x') || address.length !== 42) {
-      showNotification('error', '请输入有效的钱包地址（0x开头，42字符）');
+      if (!isPageChange) {
+        showNotification('error', '请输入有效的钱包地址（0x开头，42字符）');
+      }
       return;
+    }
+
+    // 🟢 如果是地址变化，重置分页到第一页
+    if (!isPageChange && currentAddressRef.current !== address) {
+      pagination.reset();
+      currentAddressRef.current = address;
     }
 
     setLoading(true);
     try {
-      const data = await getUserTeam(address);
+      const data = await getUserTeam(address, {
+        limit: pagination.pageSize,
+        offset: pagination.offset,
+      });
       if (data.ok) {
         setTarget(data.target);
         setUpline(data.upline);
         setDownline(data.downline || []);
-        showNotification('success', '查询成功');
+        pagination.setTotal(data.total || 0); // 🟢 设置总数
+        setTotalDownline(data.total || 0);
+        if (!isPageChange) {
+          showNotification('success', '查询成功');
+        }
       }
     } catch (e: any) {
       const errorMsg = e?.message || '查询失败';
@@ -42,13 +61,23 @@ const TeamHierarchy: React.FC = () => {
         setTarget(null);
         setUpline(null);
         setDownline([]);
+        setTotalDownline(0);
+        pagination.reset();
+        currentAddressRef.current = '';
       } else {
         showNotification('error', `查询失败: ${errorMsg}`);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchAddress, pagination.pageSize, pagination.offset, pagination.setTotal, pagination.reset, showNotification]);
+
+  // 🟢 分页变化时重新加载数据
+  useEffect(() => {
+    if (currentAddressRef.current) {
+      handleSearch(true); // 传递 isPageChange=true，不显示成功提示
+    }
+  }, [pagination.page, handleSearch]);
 
   const copyAddress = (address: string) => {
     navigator.clipboard.writeText(address);
@@ -175,10 +204,40 @@ const TeamHierarchy: React.FC = () => {
 
           {/* 下级团队 */}
           <div>
-            <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-              <ArrowDown className="text-purple-400" size={20} />
-              下级团队 ({downline.length} 人)
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ArrowDown className="text-purple-400" size={20} />
+                下级团队 ({totalDownline} 人)
+              </h2>
+              {/* 🟢 分页控件 */}
+              {totalDownline > pagination.pageSize && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-zinc-500">
+                    显示第 {pagination.offset + 1}-{Math.min(pagination.offset + pagination.pageSize, totalDownline)} 条，
+                    共 {totalDownline} 条
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={pagination.prevPage}
+                      disabled={!pagination.hasPrev}
+                      className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+                    >
+                      上一页
+                    </button>
+                    <span className="text-sm text-zinc-400 min-w-[80px] text-center">
+                      第 {pagination.page} / {pagination.totalPages} 页
+                    </span>
+                    <button
+                      onClick={pagination.nextPage}
+                      disabled={!pagination.hasNext}
+                      className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition-colors"
+                    >
+                      下一页
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {downline.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {downline.map((member, index) => (

@@ -506,7 +506,16 @@ export async function adjustUserAsset(params: {
 }
 
 // 获取用户团队关系（上级、下级）
-export async function getUserTeam(address: string) {
+// 🟢 优化：支持分页参数
+export async function getUserTeam(
+  address: string,
+  options?: { limit?: number; offset?: number }
+) {
+  const params = new URLSearchParams();
+  if (options?.limit) params.append('limit', String(options.limit));
+  if (options?.offset) params.append('offset', String(options.offset));
+  
+  const queryString = params.toString();
   return apiFetch<{
     ok: boolean;
     target: {
@@ -527,7 +536,8 @@ export async function getUserTeam(address: string) {
       inviteCount: string;
       registeredAt: string;
     }>;
-  }>(`/admin/users/${encodeURIComponent(address)}/team`);
+    total: number; // 🟢 新增：总数字段
+  }>(`/admin/users/${encodeURIComponent(address)}/team${queryString ? `?${queryString}` : ''}`);
 }
 
 export async function sendUserNotification(params: {
