@@ -16,7 +16,7 @@ const Dashboard: React.FC = () => {
     let usersTotal = 0;
     
     try {
-      // 🟢 优化：先加载基础 KPI 数据（快速显示），持币大户排行异步加载
+      // 🟢 优化：先加载基础 KPI 数据（快速显示）
       const data = await getAdminKPIs();
       
       // 转换后端数据格式为前端格式
@@ -42,16 +42,7 @@ const Dashboard: React.FC = () => {
       
       // 🟢 优化：先设置基础 KPI，立即显示
       setKpis(mockData);
-      
-      // 🟢 优化：持币大户排行异步加载（不影响主数据展示）
-      getTopRATHolders(5)
-        .then(holders => {
-          setTopHolders(holders.items || []);
-        })
-        .catch(() => {
-          // 失败时设置为空数组，不影响主数据
-          setTopHolders([]);
-        });
+      // 🟢 修复：持币大户排行已独立刷新，不再在这里调用
     } catch (error: any) {
       console.error('获取 KPI 失败', error);
       showNotification('error', `获取 KPI 失败: ${error?.message || '未知错误'}`);
@@ -82,12 +73,32 @@ const Dashboard: React.FC = () => {
     }
   }, [showNotification]);
 
-  // 🟢 优化：使用 useAutoRefresh Hook
+  // 🟢 优化：持币大户排行独立刷新函数（降低刷新频率）
+  const fetchTopHolders = useCallback(async () => {
+    try {
+      const holders = await getTopRATHolders(5);
+      setTopHolders(holders.items || []);
+    } catch (error: any) {
+      console.error('获取持币大户排行失败:', error);
+      // 失败时设置为空数组，不影响主数据
+      setTopHolders([]);
+    }
+  }, []);
+
+  // 🟢 优化：使用 useAutoRefresh Hook（KPI 数据每 15 秒刷新）
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
     interval: 15000,
     onRefresh: fetchKPIs,
     immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
+  });
+
+  // 🟢 优化：持币大户排行独立刷新（每 60 秒刷新一次，降低频率）
+  useAutoRefresh({
+    enabled: true,
+    interval: 60000, // 60 秒刷新一次
+    onRefresh: fetchTopHolders,
+    immediate: true, // 立即加载一次
   });
 
   // 🟢 修复：添加初始加载逻辑
