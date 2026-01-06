@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2 } from 'lucide-react';
 import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig, updateSystemConfig } from '../lib/api';
 import { Withdrawal } from '../types';
-import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT } from '../utils/web3';
+import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT, openMetaMaskApp } from '../utils/web3';
+import { isMobile } from '../utils/device';
 import { useNotifications, NotificationContainer } from '../components/Notification';
 import { useConfirmDialog, ConfirmDialog } from '../components/ConfirmDialog';
 import { Loading, EmptyState, ActionButton } from '../components';
@@ -28,6 +29,9 @@ const FinanceOps: React.FC = () => {
   const [adminPayoutAddress, setAdminPayoutAddress] = useState<string | null>(null);
   const [walletAddressMatched, setWalletAddressMatched] = useState<boolean | null>(null);
 
+  // 🟢 移动端支持：显示 Deep Link 提示弹窗
+  const [showMobileTip, setShowMobileTip] = useState(false);
+
   // 通知系统
   const { notifications, showNotification, removeNotification } = useNotifications();
   
@@ -41,6 +45,28 @@ const FinanceOps: React.FC = () => {
     checkWalletConnection();
     loadAdminPayoutConfig();
   }, []);
+
+  // 🟢 自动重连机制：页面重新获得焦点时检查连接状态
+  useEffect(() => {
+    const handleFocus = async () => {
+      // 移动端特殊处理：用户可能从 MetaMask 应用返回
+      if (isMobile() && !walletConnected) {
+        console.log('[FinanceOps] 📱 页面重新获得焦点，尝试自动重连...');
+        const address = await getConnectedAddress();
+        if (address) {
+          console.log('[FinanceOps] ✅ 自动重连成功:', address);
+          setWalletConnected(true);
+          setWalletAddress(address);
+          setAdminPayoutAddress(address);
+          showNotification('success', '钱包已自动连接');
+          fetchUsdtBalance();
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [walletConnected]);
 
   // 加载管理员钱包配置
   const loadAdminPayoutConfig = async () => {
@@ -107,8 +133,14 @@ const FinanceOps: React.FC = () => {
     }
   };
 
-  // 连接钱包
+  // 连接钱包（支持移动端）
   const handleConnectWallet = async () => {
+    // 桌面端：检查扩展
+    if (!isMobile() && !checkMetaMask()) {
+      showNotification('error', '请安装 MetaMask 浏览器扩展');
+      return;
+    }
+
     setConnectingWallet(true);
     try {
       await connectWallet();
@@ -135,6 +167,18 @@ const FinanceOps: React.FC = () => {
         fetchUsdtBalance();
       }
     } catch (e: any) {
+      console.error('连接钱包失败:', e);
+      
+      // 🟢 移动端特殊处理：唤起 MetaMask 应用
+      if (e.message === 'REDIRECT_TO_METAMASK') {
+        setShowMobileTip(true);
+        // 2秒后自动跳转
+        setTimeout(() => {
+          openMetaMaskApp();
+        }, 2000);
+        return;
+      }
+      
       showNotification('error', `连接失败: ${e.message || '未知错误'}`);
     } finally {
       setConnectingWallet(false);
@@ -325,6 +369,45 @@ const FinanceOps: React.FC = () => {
           onCancel={handleConfirmCancel}
         />
       )}
+      
+      {/* 🟢 移动端连接提示弹窗 */}
+      {showMobileTip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-white mb-3">正在打开 MetaMask</h3>
+            <p className="text-sm text-zinc-400 mb-4">
+              即将跳转到 MetaMask 应用，请在应用中完成连接后返回浏览器。
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  openMetaMaskApp();
+                }}
+                className="w-full py-3 bg-[#f6851b] hover:bg-[#e2761b] text-white font-bold rounded-xl transition-all"
+              >
+                立即打开 MetaMask
+              </button>
+              <button
+                onClick={() => setShowMobileTip(false)}
+                className="w-full py-3 text-zinc-500 hover:text-white font-medium text-sm transition-colors"
+              >
+                取消
+              </button>
+            </div>
+            <p className="text-xs text-zinc-600 mt-4 text-center">
+              没有 MetaMask？
+              <a 
+                href="https://metamask.io/download/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#f6851b] hover:underline ml-1"
+              >
+                下载安装
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">财务审核</h2>
@@ -361,13 +444,17 @@ const FinanceOps: React.FC = () => {
           ) : (
             <ActionButton
               onClick={handleConnectWallet}
-              disabled={!checkMetaMask()}
+              disabled={!checkMetaMask() && !isMobile()}
               loading={connectingWallet}
               variant="primary"
-              title="连接 MetaMask 钱包以便手动发放提现"
+              title={
+                isMobile() 
+                  ? "点击连接 MetaMask 移动应用" 
+                  : "连接 MetaMask 钱包以便手动发放提现"
+              }
             >
               <Wallet size={18} />
-              连接出款钱包
+              {isMobile() ? '连接出款钱包（移动端）' : '连接出款钱包'}
             </ActionButton>
           )}
         </div>

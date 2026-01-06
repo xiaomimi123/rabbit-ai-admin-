@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { isMobile, isMetaMaskApp, hasMetaMaskExtension } from './device';
 
 // ERC20 ABI (只需要 transfer 函数)
 const ERC20_ABI = [
@@ -12,34 +13,85 @@ const ERC20_ABI = [
 const BSC_CHAIN_ID = 56;
 
 /**
- * 检查 MetaMask 是否安装
+ * 检查 MetaMask 是否可用（支持移动端）
  */
 export function checkMetaMask(): boolean {
-  return typeof window !== 'undefined' && typeof (window as any).ethereum !== 'undefined';
+  if (typeof window === 'undefined') return false;
+  
+  // 桌面端：检查扩展
+  if (!isMobile()) {
+    return hasMetaMaskExtension();
+  }
+  
+  // 移动端：检查应用内浏览器或允许唤起
+  return isMetaMaskApp() || isMobile();
 }
 
 /**
- * 连接 MetaMask 钱包
+ * 连接 MetaMask 钱包（支持移动端）
  */
 export async function connectWallet(): Promise<ethers.providers.Web3Provider> {
-  if (!checkMetaMask()) {
-    throw new Error('请安装 MetaMask 浏览器扩展');
+  // 桌面端：使用扩展
+  if (!isMobile() && hasMetaMaskExtension()) {
+    const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+    
+    // 请求连接账户
+    await provider.send('eth_requestAccounts', []);
+    
+    // 检查网络，如果不匹配则自动切换
+    const network = await provider.getNetwork();
+    if (network.chainId !== BSC_CHAIN_ID) {
+      await switchToBSC();
+      // 重新获取 provider（网络切换后）
+      return new ethers.providers.Web3Provider((window as any).ethereum);
+    }
+    
+    return provider;
   }
+  
+  // 移动端 MetaMask 应用内：直接使用
+  if (isMobile() && isMetaMaskApp()) {
+    const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+    
+    // 请求连接账户
+    await provider.send('eth_requestAccounts', []);
+    
+    // 检查网络，如果不匹配则自动切换
+    const network = await provider.getNetwork();
+    if (network.chainId !== BSC_CHAIN_ID) {
+      await switchToBSC();
+      // 重新获取 provider（网络切换后）
+      return new ethers.providers.Web3Provider((window as any).ethereum);
+    }
+    
+    return provider;
+  }
+  
+  // 移动端普通浏览器：使用 Deep Link 唤起
+  if (isMobile()) {
+    throw new Error('REDIRECT_TO_METAMASK'); // 特殊错误码，用于触发 Deep Link
+  }
+  
+  // 桌面端未安装扩展
+  throw new Error('请安装 MetaMask 浏览器扩展');
+}
 
-  const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+/**
+ * 通过 Deep Link 打开 MetaMask 应用
+ */
+export function openMetaMaskApp(): void {
+  if (typeof window === 'undefined') return;
   
-  // 请求连接账户
-  await provider.send('eth_requestAccounts', []);
+  const host = window.location.host;
   
-  // 检查网络，如果不匹配则自动切换
-  const network = await provider.getNetwork();
-  if (network.chainId !== BSC_CHAIN_ID) {
-    await switchToBSC();
-    // 重新获取 provider（网络切换后）
-    return new ethers.providers.Web3Provider((window as any).ethereum);
-  }
+  // MetaMask Deep Link 格式
+  // 这会唤起 MetaMask 应用并加载当前网站
+  const deepLink = `https://metamask.app.link/dapp/${host}`;
   
-  return provider;
+  console.log('[Web3] 🚀 正在唤起 MetaMask 应用...');
+  console.log('[Web3] Deep Link:', deepLink);
+  
+  window.location.href = deepLink;
 }
 
 /**
