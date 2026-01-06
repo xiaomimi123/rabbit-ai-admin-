@@ -9,6 +9,7 @@ import OperationRecords from './pages/OperationRecords';
 import RevenuePage from './pages/Revenue';
 import WithdrawalExpenses from './pages/WithdrawalExpenses';
 import YieldStrategy from './pages/YieldStrategy';
+import EnergyConfigPage from './pages/EnergyConfig';
 import UsersPage from './pages/Users';
 import TeamHierarchy from './pages/TeamHierarchy';
 import SystemConfigPage from './pages/SystemConfig';
@@ -145,6 +146,7 @@ const App: React.FC = () => {
             <Route path="/revenue" element={<RevenuePage />} />
             <Route path="/expenses" element={<WithdrawalExpenses />} />
             <Route path="/yield" element={<YieldStrategy />} />
+            <Route path="/energy-config" element={<EnergyConfigPage />} />
             <Route path="/finance" element={<FinanceOps />} />
             <Route path="/records" element={<OperationRecords />} />
             <Route path="/users" element={<UsersPage />} />

@@ -20,7 +20,8 @@ import {
   Network,
   Megaphone,
   FileCode,
-  BarChart
+  BarChart,
+  Zap
 } from 'lucide-react';
 import { getAdminKey } from '../lib/api';
 
@@ -46,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: '支出明细', icon: WalletMinimal, path: '/expenses' },
     { name: '财务审核', icon: Wallet, path: '/finance' },
     { name: '收益策略', icon: Percent, path: '/yield' },
+    { name: '能量配置', icon: Zap, path: '/energy-config' },
     { name: '操作记录', icon: ClipboardList, path: '/records' },
     { name: '用户管理', icon: Users, path: '/users' },
     { name: '团队关系', icon: Network, path: '/team' },

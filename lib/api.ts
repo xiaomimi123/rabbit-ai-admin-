@@ -611,3 +611,63 @@ export async function updateSystemConfig(key: string, value: any) {
     body: JSON.stringify(bodyValue),
   });
 }
+
+// 9. EnergyConfig - 能量配置管理
+export async function getEnergyConfig() {
+  return apiFetch<{
+    ok: boolean;
+    configs: Array<{
+      key: string;
+      value: number;
+      description: string;
+      updatedAt: string;
+    }>;
+  }>('/admin/energy-config');
+}
+
+export async function updateEnergyConfig(
+  key: string,
+  value: number,
+  reason?: string
+) {
+  return apiFetch<{
+    ok: boolean;
+    oldValue: number;
+    newValue: number;
+    message: string;
+  }>('/admin/energy-config/update', {
+    method: 'POST',
+    body: JSON.stringify({ key, value, reason }),
+  });
+}
+
+export async function getEnergyConfigHistory(
+  key?: string,
+  limit: number = 50
+) {
+  const params = new URLSearchParams();
+  if (key) params.append('key', key);
+  params.append('limit', String(limit));
+  
+  return apiFetch<{
+    ok: boolean;
+    history: Array<{
+      id: string;
+      key: string;
+      oldValue: number | null;
+      newValue: number;
+      changedBy: string | null;
+      changeReason: string | null;
+      createdAt: string;
+    }>;
+  }>(`/admin/energy-config/history?${params.toString()}`);
+}
+
+export async function clearEnergyConfigCache() {
+  return apiFetch<{
+    ok: boolean;
+    message: string;
+  }>('/admin/energy-config/clear-cache', {
+    method: 'POST',
+  });
+}
