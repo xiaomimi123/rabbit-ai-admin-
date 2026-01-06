@@ -9,9 +9,29 @@
 export function isMobile(): boolean {
   if (typeof window === 'undefined') return false;
   
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  );
+  // 检测 User Agent
+  const ua = navigator.userAgent;
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  
+  // iOS 特殊检测（有些 iPad 在 iOS 13+ 会伪装成桌面版）
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  
+  // 检测触摸屏支持（作为备用检测）
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
+  const result = isMobileUA || isIOS || (isTouchDevice && window.innerWidth < 1024);
+  
+  console.log('[Device] 设备检测:', {
+    userAgent: ua,
+    isMobileUA,
+    isIOS,
+    isTouchDevice,
+    innerWidth: window.innerWidth,
+    result
+  });
+  
+  return result;
 }
 
 /**

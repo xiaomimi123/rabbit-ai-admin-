@@ -444,7 +444,7 @@ const FinanceOps: React.FC = () => {
           ) : (
             <ActionButton
               onClick={handleConnectWallet}
-              disabled={!checkMetaMask() && !isMobile()}
+              disabled={false}
               loading={connectingWallet}
               variant="primary"
               title={
