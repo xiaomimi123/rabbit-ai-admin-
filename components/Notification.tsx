@@ -54,7 +54,8 @@ export const NotificationContainer: React.FC<NotificationProps> = ({ notificatio
 export const useNotifications = () => {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
 
-  const showNotification = (type: Notification['type'], message: string, duration = 3000) => {
+  // 🟢 修复：使用 useCallback 避免每次渲染都创建新函数
+  const showNotification = React.useCallback((type: Notification['type'], message: string, duration = 3000) => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     setNotifications(prev => [...prev, { id, type, message }]);
     
@@ -65,11 +66,12 @@ export const useNotifications = () => {
     }
     
     return id;
-  };
+  }, []); // 🟢 空依赖数组，函数引用永远不变
 
-  const removeNotification = (id: string) => {
+  // 🟢 修复：使用 useCallback 避免每次渲染都创建新函数
+  const removeNotification = React.useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, []); // 🟢 空依赖数组，函数引用永远不变
 
   return {
     notifications,

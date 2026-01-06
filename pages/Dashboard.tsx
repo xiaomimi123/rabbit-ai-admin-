@@ -71,7 +71,9 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [showNotification]);
+    // 🟢 修复：移除 showNotification 依赖（现在 showNotification 引用稳定了）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 🟢 优化：持币大户排行独立刷新函数（降低刷新频率）
   const fetchTopHolders = useCallback(async () => {
