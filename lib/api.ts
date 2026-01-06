@@ -669,5 +669,6 @@ export async function clearEnergyConfigCache() {
     message: string;
   }>('/admin/energy-config/clear-cache', {
     method: 'POST',
+    body: JSON.stringify({}), // 🔧 修复：POST 请求需要提供 body
   });
 }
