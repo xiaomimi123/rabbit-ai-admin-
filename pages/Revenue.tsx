@@ -31,6 +31,7 @@ const RevenuePage: React.FC = () => {
     estimatedDaily: string;
     avgFee: string;
   } | null>(null);
+  const [totalRevenue, setTotalRevenue] = useState('0.0000'); // 🟢 新增：存储后端返回的总收益
   const { notifications, showNotification, removeNotification } = useNotifications();
 
   const fetchStats = async () => {
@@ -75,6 +76,12 @@ const RevenuePage: React.FC = () => {
         timestamp: new Date(item.timestamp).toLocaleString(),
         txHash: item.txHash,
       })));
+      
+      // 🟢 修复：使用后端返回的 total（所有记录的总收益）
+      if (typeof data.total === 'number') {
+        setTotalRevenue(data.total.toFixed(4));
+        console.log(`[Revenue] ✅ 累计总收益: ${data.total.toFixed(4)} BNB`);
+      }
     } catch (e: any) {
       console.error(e);
       showNotification('error', `获取收益记录失败: ${e?.message || '未知错误'}`);
@@ -127,15 +134,6 @@ const RevenuePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1); // 搜索时重置到第一页
   }, [searchTerm]);
-
-  const totalRevenue = useMemo(() => {
-    // 如果 stats 有数据，优先使用 stats 的 totalRevenue（今日累计）
-    // 否则使用当前筛选范围内的记录总和
-    if (stats && dateRange === '24h') {
-      return stats.totalRevenue;
-    }
-    return records.reduce((acc, curr) => acc + curr.feeAmount, 0).toFixed(4);
-  }, [records, stats, dateRange]);
 
   const handleExport = () => {
     showNotification('info', '正在准备 CSV 收益报表，请稍候...');
