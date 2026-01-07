@@ -178,6 +178,12 @@ export async function getPendingWithdrawals(limit = 50) {
       createdAt: string;
       updatedAt: string;
       alert: boolean;
+      userStats?: { // 🟢 新增：用户画像数据
+        ratBalance: number;
+        energyAvailable: number;
+        totalEarnings: number;
+        vipLevel: number;
+      };
     }>;
   }>(`/admin/withdrawals/pending?limit=${limit}`);
 }

@@ -32,6 +32,14 @@ export interface Withdrawal {
   amount: number;
   status: 'Pending' | 'Completed' | 'Rejected';
   createdAt: string;
+  energyLockedAmount?: number; // 🟢 新增：本次提现锁定的能量值
+  alert?: boolean; // 🟢 新增：是否告警
+  userStats?: { // 🟢 新增：用户画像数据
+    ratBalance: number; // RAT 持仓
+    energyAvailable: number; // 可用能量
+    totalEarnings: number; // 累计收益
+    vipLevel: number; // VIP 等级
+  };
 }
 
 export interface ClaimRecord {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2 } from 'lucide-react';
+import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2, Coins, Zap, TrendingUp, Crown } from 'lucide-react';
 import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig, updateSystemConfig } from '../lib/api';
 import { Withdrawal } from '../types';
 import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT, openMetaMaskApp } from '../utils/web3';
@@ -296,6 +296,9 @@ const FinanceOps: React.FC = () => {
         amount: parseFloat(item.amount),
         status: item.status as 'Pending' | 'Completed' | 'Rejected',
         createdAt: new Date(item.createdAt).toLocaleString(),
+        energyLockedAmount: parseFloat(item.energyLockedAmount || '0'), // 🟢 新增：锁定的能量值
+        alert: item.alert || false, // 🟢 新增：告警标志
+        userStats: item.userStats, // 🟢 新增：用户画像数据
       })));
     } catch (e) {
       console.error(e);
@@ -337,8 +340,22 @@ const FinanceOps: React.FC = () => {
     );
   };
 
+  // 🟢 新增：交易哈希格式验证
+  const validateTxHash = (hash: string): boolean => {
+    if (!hash) return false;
+    // 必须以 0x 开头，长度为 66 字符（0x + 64 个十六进制字符）
+    return /^0x[a-fA-F0-9]{64}$/.test(hash);
+  };
+
   const handleCompleteApprove = async () => {
     if (!activeWithdrawal || !txHash) return;
+    
+    // 🟢 新增：交易哈希格式验证
+    if (!validateTxHash(txHash)) {
+      showNotification('error', '交易哈希格式不正确，必须以 0x 开头，长度为 66 字符');
+      return;
+    }
+    
     setProcessingId(activeWithdrawal.id);
     try {
       await completeWithdrawal(activeWithdrawal.id, txHash);
@@ -476,24 +493,86 @@ const FinanceOps: React.FC = () => {
               <EmptyState variant="database" title="全部处理完毕" description="目前没有待审批的提现" />
             </div>
           ) : withdrawals.map(w => (
-            <div key={w.id} className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-800/20 transition-colors">
-              <div className="flex items-start gap-4">
-                <div className="mt-1 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
-                  <Wallet className="text-emerald-500" size={24} />
+            <div key={w.id} className={`p-4 sm:p-6 flex flex-col gap-4 hover:bg-zinc-800/20 transition-colors ${w.alert ? 'border-l-4 border-yellow-500 bg-yellow-500/5' : ''}`}>
+              {/* 🟢 新增：告警标志 */}
+              {w.alert && (
+                <div className="flex items-center gap-2 text-yellow-500 text-xs font-bold">
+                  <AlertTriangle size={14} />
+                  <span>大额提现告警</span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono text-zinc-300 break-all">{w.address}</span>
+              )}
+              
+              <div className="flex items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="mt-1 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
+                    <Wallet className="text-emerald-500" size={24} />
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-2xl font-black text-white tracking-tighter">${w.amount.toFixed(2)} USDT</p>
-                    <span className="text-[10px] bg-zinc-800 px-2 py-0.5 rounded uppercase font-bold text-zinc-500 tracking-wider">编号: {w.id}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono text-zinc-300 break-all">{w.address}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <p className="text-2xl font-black text-white tracking-tighter">${w.amount.toFixed(2)} USDT</p>
+                      <span className="text-[10px] bg-zinc-800 px-2 py-0.5 rounded uppercase font-bold text-zinc-500 tracking-wider">编号: {w.id}</span>
+                      {/* 🟢 新增：显示锁定的能量值 */}
+                      {w.energyLockedAmount !== undefined && w.energyLockedAmount > 0 && (
+                        <span className="text-xs text-red-400 font-bold">
+                          ⚡ -{w.energyLockedAmount} 能量
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1">申请于 {w.createdAt}</p>
+                    
+                    {/* 🟢 新增：用户画像信息栏 */}
+                    {w.userStats && (
+                      <div className="mt-3 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp size={12} className="text-zinc-500" />
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">用户画像</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <Coins size={12} className="text-blue-400" />
+                            <div>
+                              <div className="text-zinc-500 text-[10px]">持仓</div>
+                              <div className="text-white font-bold">{w.userStats.ratBalance.toLocaleString()} RAT</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Zap size={12} className="text-yellow-400" />
+                            <div>
+                              <div className="text-zinc-500 text-[10px]">能量</div>
+                              <div className="text-white font-bold">
+                                <span className="text-red-400">-{w.energyLockedAmount || 0}</span>
+                                <span className="text-zinc-500"> / </span>
+                                <span>{w.userStats.energyAvailable}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <TrendingUp size={12} className="text-emerald-400" />
+                            <div>
+                              <div className="text-zinc-500 text-[10px]">余额</div>
+                              <div className="text-white font-bold">${w.userStats.totalEarnings.toFixed(2)}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Crown size={12} className="text-purple-400" />
+                            <div>
+                              <div className="text-zinc-500 text-[10px]">等级</div>
+                              <div className="text-white font-bold">
+                                {w.userStats.vipLevel > 0 ? `VIP ${w.userStats.vipLevel}` : 'NOVICE'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[11px] text-zinc-500 mt-1">申请于 {w.createdAt}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                 <ActionButton
                   onClick={() => handleReject(w.id)}
                   disabled={processingId === w.id}
@@ -571,10 +650,21 @@ const FinanceOps: React.FC = () => {
                 <input 
                   type="text" 
                   placeholder="0x..."
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
+                  className={`w-full bg-zinc-950 border rounded-lg px-4 py-3 text-sm outline-none focus:ring-1 transition-all font-mono ${
+                    txHash && !validateTxHash(txHash) 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-800 focus:border-emerald-500 focus:ring-emerald-500'
+                  }`}
                   value={txHash}
                   onChange={(e) => setTxHash(e.target.value)}
                 />
+                {/* 🟢 新增：交易哈希格式验证提示 */}
+                {txHash && !validateTxHash(txHash) && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    交易哈希格式不正确，必须以 0x 开头，长度为 66 字符
+                  </p>
+                )}
               </div>
             </div>
 
@@ -587,7 +677,7 @@ const FinanceOps: React.FC = () => {
               </button>
               <button 
                 onClick={handleCompleteApprove}
-                disabled={!txHash || processingId === activeWithdrawal.id}
+                disabled={!txHash || !validateTxHash(txHash) || processingId === activeWithdrawal.id}
                 className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-zinc-950 font-black text-sm rounded-xl flex items-center justify-center gap-2 transition-all"
               >
                 <Send size={16} />
