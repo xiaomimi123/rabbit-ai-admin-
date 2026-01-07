@@ -68,6 +68,7 @@ export interface OperationRecord {
   txHash?: string;
   amountBefore?: string;
   amountAfter?: string;
+  energyChange?: number | null; // 🟢 新增：能量变动字段（正数表示增加，负数表示减少）
 }
 
 export interface SystemConfig {

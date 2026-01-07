@@ -170,15 +170,16 @@ const OperationRecords: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">用户</th>
                 <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">操作类型</th>
                 <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">数值</th>
+                <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">能量变动</th>
                 <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">状态</th>
                 <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">链上凭证</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
               {loading && isInitialLoad ? (
-                <tr><td colSpan={6} className="px-6 py-20"><TableSkeleton rows={5} cols={6} /></td></tr>
+                <tr><td colSpan={7} className="px-6 py-20"><TableSkeleton rows={5} cols={7} /></td></tr>
               ) : paginatedData.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-20"><EmptyState variant="database" title="暂无操作记录" description="当前筛选条件下没有找到操作记录" /></td></tr>
+                <tr><td colSpan={7} className="px-6 py-20"><EmptyState variant="database" title="暂无操作记录" description="当前筛选条件下没有找到操作记录" /></td></tr>
               ) : paginatedData.map((rec) => (
                 <tr key={rec.id} className="hover:bg-zinc-800/30 transition-colors group">
                   <td className="px-6 py-4">
@@ -253,6 +254,18 @@ const OperationRecords: React.FC = () => {
                         </div>
                       )}
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {/* 🟢 新增：能量变动显示 */}
+                    {rec.energyChange !== null && rec.energyChange !== undefined ? (
+                      <span className={`text-sm font-bold ${
+                        rec.energyChange > 0 ? 'text-emerald-400' : 'text-red-400'
+                      }`}>
+                        {rec.energyChange > 0 ? '+' : ''}{rec.energyChange} ⚡
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-600 font-medium">--</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <StatusBadge status={rec.status} />
