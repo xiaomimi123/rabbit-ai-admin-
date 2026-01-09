@@ -21,7 +21,8 @@ import {
   Megaphone,
   FileCode,
   BarChart,
-  Zap
+  Zap,
+  Zap as AutoPayoutIcon
 } from 'lucide-react';
 import { getAdminKey } from '../lib/api';
 
@@ -46,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: '收益明细', icon: BarChart3, path: '/revenue' },
     { name: '支出明细', icon: WalletMinimal, path: '/expenses' },
     { name: '财务审核', icon: Wallet, path: '/finance' },
+    { name: '自动放款', icon: AutoPayoutIcon, path: '/auto-payout' },
     { name: '收益策略', icon: Percent, path: '/yield' },
     { name: '能量配置', icon: Zap, path: '/energy-config' },
     { name: '操作记录', icon: ClipboardList, path: '/records' },

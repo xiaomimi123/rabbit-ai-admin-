@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Wallet, CheckCircle2, Clock, AlertTriangle, ExternalLink, Send, ShieldCheck, Loader2, Coins, Zap, TrendingUp, Crown } from 'lucide-react';
-import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig, updateSystemConfig } from '../lib/api';
+import { getPendingWithdrawals, rejectWithdrawal, completeWithdrawal, getUsdtInfo, getAdminUsdtBalance, getSystemConfig, updateSystemConfig, getAutoPayoutConfig } from '../lib/api';
 import { Withdrawal } from '../types';
 import { checkMetaMask, connectWallet, getConnectedAddress, transferUSDT, openMetaMaskApp } from '../utils/web3';
 import { isMobile } from '../utils/device';
@@ -28,6 +28,10 @@ const FinanceOps: React.FC = () => {
   // 管理员钱包配置
   const [adminPayoutAddress, setAdminPayoutAddress] = useState<string | null>(null);
   const [walletAddressMatched, setWalletAddressMatched] = useState<boolean | null>(null);
+  
+  // 🟢 自动放款配置
+  const [autoPayoutThreshold, setAutoPayoutThreshold] = useState<number | null>(null);
+  const [autoPayoutEnabled, setAutoPayoutEnabled] = useState(false);
 
   // 🟢 移动端支持：显示 Deep Link 提示弹窗
   const [showMobileTip, setShowMobileTip] = useState(false);
@@ -44,7 +48,21 @@ const FinanceOps: React.FC = () => {
     loadUsdtInfo();
     checkWalletConnection();
     loadAdminPayoutConfig();
+    loadAutoPayoutConfig();
   }, []);
+
+  // 加载自动放款配置
+  const loadAutoPayoutConfig = async () => {
+    try {
+      const data = await getAutoPayoutConfig();
+      if (data.ok) {
+        setAutoPayoutThreshold(data.threshold);
+        setAutoPayoutEnabled(data.enabled);
+      }
+    } catch (e) {
+      console.error('加载自动放款配置失败', e);
+    }
+  };
 
   // 🟢 自动重连机制：页面重新获得焦点时检查连接状态
   useEffect(() => {
@@ -518,6 +536,13 @@ const FinanceOps: React.FC = () => {
                       {w.energyLockedAmount !== undefined && w.energyLockedAmount > 0 && (
                         <span className="text-xs text-red-400 font-bold">
                           ⚡ -{w.energyLockedAmount} 能量
+                        </span>
+                      )}
+                      {/* 🟢 新增：自动放款标记 */}
+                      {autoPayoutEnabled && autoPayoutThreshold !== null && w.amount < autoPayoutThreshold && (
+                        <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                          <Zap size={12} />
+                          将自动放款
                         </span>
                       )}
                     </div>

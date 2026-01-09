@@ -16,6 +16,7 @@ import SystemConfigPage from './pages/SystemConfig';
 import BroadcastHistoryPage from './pages/BroadcastHistory';
 import ContractSettingsPage from './pages/ContractSettings';
 import AnalyticsPage from './pages/Analytics';
+import AutoPayoutConfigPage from './pages/AutoPayoutConfig';
 import { setAdminKey, getAdminKey, verifyAdminKey } from './lib/api';
 import { Rabbit, Key, AlertCircle } from 'lucide-react';
 
@@ -155,6 +156,7 @@ const App: React.FC = () => {
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/contract" element={<ContractSettingsPage />} />
             <Route path="/system" element={<SystemConfigPage />} />
+            <Route path="/auto-payout" element={<AutoPayoutConfigPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

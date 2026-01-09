@@ -678,3 +678,57 @@ export async function clearEnergyConfigCache() {
     body: JSON.stringify({}), // 🔧 修复：POST 请求需要提供 body
   });
 }
+
+// 10. AutoPayout - 自动放款配置
+export async function configureAutoPayout(params: {
+  privateKey: string;
+  threshold: number;
+  enabled: boolean;
+  minBalance?: number;
+  dailyLimit?: number | null;
+}) {
+  return apiFetch<{
+    ok: boolean;
+    walletAddress: string;
+    threshold: number;
+    enabled: boolean;
+  }>('/admin/system/auto-payout/configure', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getAutoPayoutConfig() {
+  return apiFetch<{
+    ok: boolean;
+    walletAddress: string | null;
+    threshold: number;
+    enabled: boolean;
+    minBalance: number;
+    dailyLimit: number | null;
+    currentBalance: string;
+  }>('/admin/system/auto-payout/config');
+}
+
+export async function getAutoPayoutLogs(params: {
+  limit?: number;
+  offset?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.offset) query.set('offset', String(params.offset));
+  
+  return apiFetch<{
+    ok: boolean;
+    items: Array<{
+      id: number;
+      withdrawalId: string;
+      amount: number;
+      txHash: string | null;
+      status: 'success' | 'failed' | 'pending';
+      errorMessage: string | null;
+      createdAt: string;
+    }>;
+    total: number;
+  }>(`/admin/system/auto-payout/logs?${query.toString()}`);
+}
