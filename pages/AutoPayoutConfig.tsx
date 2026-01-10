@@ -100,12 +100,6 @@ const AutoPayoutConfigPage: React.FC = () => {
       return;
     }
 
-    // 如果已配置过，且私钥为空，说明用户不想更新私钥
-    if (config?.walletAddress && !privateKey) {
-      showNotification('warning', '如需更新私钥，请输入新私钥');
-      return;
-    }
-
     // 如果未配置过，必须提供私钥
     if (!config?.walletAddress && !privateKey) {
       showNotification('error', '首次配置必须提供私钥');
