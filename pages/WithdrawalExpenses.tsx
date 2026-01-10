@@ -28,6 +28,7 @@ const WithdrawalExpenses: React.FC = () => {
   // 🟢 修复：服务端分页
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0); // 🟢 新增：总记录数
+  const [totalAmount, setTotalAmount] = useState(0); // 🟢 新增：总支出金额（来自后端）
   const itemsPerPage = 20;
 
   // 🟢 修复：使用 useCallback 稳定函数引用，移除 showNotification 依赖避免无限循环
@@ -66,6 +67,7 @@ const WithdrawalExpenses: React.FC = () => {
         createdAt: new Date(item.createdAt).toLocaleString(),
       })));
       setTotalCount(data.totalCount || 0); // 🟢 新增：保存总记录数
+      setTotalAmount(data.total || 0); // 🟢 新增：保存总支出金额（后端聚合数据）
     } catch (e: any) {
       console.error('[fetchExpenses] Error:', e);
       // 🟢 修复：使用稳定的 showNotification 引用
@@ -114,9 +116,10 @@ const WithdrawalExpenses: React.FC = () => {
     setCurrentPage(1); // 搜索时重置到第一页
   }, [searchTerm]);
 
+  // 🟢 修复：使用后端返回的总金额，而不是计算当前页的总和
   const totalSpent = useMemo(() => {
-    return records.reduce((acc, curr) => acc + curr.amount, 0).toFixed(2);
-  }, [records]);
+    return totalAmount.toFixed(2);
+  }, [totalAmount]);
 
   // 🟢 修复：客户端搜索（基于当前页数据）
   const filteredRecords = useMemo(() => {
