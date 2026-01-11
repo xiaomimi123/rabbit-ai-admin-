@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './pages/Dashboard';
@@ -19,6 +20,18 @@ import AnalyticsPage from './pages/Analytics';
 import AutoPayoutConfigPage from './pages/AutoPayoutConfig';
 import { setAdminKey, getAdminKey, verifyAdminKey } from './lib/api';
 import { Rabbit, Key, AlertCircle } from 'lucide-react';
+
+// 配置 React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30000, // 数据30秒内视为新鲜
+      gcTime: 5 * 60 * 1000, // 缓存保留5分钟
+      refetchOnWindowFocus: false, // 窗口聚焦时不自动刷新
+      retry: 1, // 失败重试1次
+    },
+  },
+});
 
 const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [inputKey, setInputKey] = useState('');
@@ -139,29 +152,31 @@ const App: React.FC = () => {
   }
 
   return (
-    <ErrorBoundary>
-      <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/revenue" element={<RevenuePage />} />
-            <Route path="/expenses" element={<WithdrawalExpenses />} />
-            <Route path="/yield" element={<YieldStrategy />} />
-            <Route path="/energy-config" element={<EnergyConfigPage />} />
-            <Route path="/finance" element={<FinanceOps />} />
-            <Route path="/records" element={<OperationRecords />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/team" element={<TeamHierarchy />} />
-            <Route path="/broadcast" element={<BroadcastHistoryPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/contract" element={<ContractSettingsPage />} />
-            <Route path="/system" element={<SystemConfigPage />} />
-            <Route path="/auto-payout" element={<AutoPayoutConfigPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/revenue" element={<RevenuePage />} />
+              <Route path="/expenses" element={<WithdrawalExpenses />} />
+              <Route path="/yield" element={<YieldStrategy />} />
+              <Route path="/energy-config" element={<EnergyConfigPage />} />
+              <Route path="/finance" element={<FinanceOps />} />
+              <Route path="/records" element={<OperationRecords />} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/team" element={<TeamHierarchy />} />
+              <Route path="/broadcast" element={<BroadcastHistoryPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/contract" element={<ContractSettingsPage />} />
+              <Route path="/system" element={<SystemConfigPage />} />
+              <Route path="/auto-payout" element={<AutoPayoutConfigPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 };
 

@@ -1,10 +1,14 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Users, AlertCircle, Coins, Gem, TrendingUp, TrendingDown, PieChart, RefreshCw } from 'lucide-react';
 import { getAdminKPIs, getTopRATHolders, getAdminUserList } from '../lib/api';
 import { KPIResponse } from '../types';
 import { useAutoRefresh } from '../hooks';
 import { CardSkeleton, EmptyState, useNotifications, NotificationContainer } from '../components';
+
+// 🚀 新增：演示 React Query hooks 的使用
+// 要使用 React Query 版本，取消注释下面一行并注释掉上面的导入
+// import { useAdminKPIs, useTopRATHolders, useUserList } from '../hooks';
 
 const Dashboard: React.FC = () => {
   const { notifications, showNotification, removeNotification } = useNotifications();
@@ -119,138 +123,131 @@ const Dashboard: React.FC = () => {
   const cards = [
     { 
       label: '总用户数', 
-      value: kpis?.totalUsers != null ? kpis.totalUsers.toLocaleString() : '0', 
-      trend: kpis?.trends.users, 
+      value: kpis?.totalUsers.toLocaleString() || '0', 
+      change: kpis?.trends?.users || 0, 
       icon: Users, 
-      color: 'blue' 
+      color: 'emerald', 
+      bgClass: 'bg-emerald-500/10',
+      iconBgClass: 'bg-emerald-500/20',
+      textClass: 'text-emerald-400'
     },
     { 
       label: '待处理提现', 
-      value: kpis?.pendingWithdrawals != null ? String(kpis.pendingWithdrawals) : '0', 
-      trend: kpis?.trends.withdrawals, 
+      value: kpis?.pendingWithdrawals?.toString() || '0', 
+      change: kpis?.trends?.withdrawals || 0, 
       icon: AlertCircle, 
-      color: kpis?.pendingWithdrawals && kpis.pendingWithdrawals > 10 ? 'red' : 'zinc' 
+      color: 'amber', 
+      bgClass: 'bg-amber-500/10',
+      iconBgClass: 'bg-amber-500/20',
+      textClass: 'text-amber-400'
     },
     { 
-      label: '空投手续费 (BNB)', 
-      value: kpis?.airdropFeesBNB != null ? kpis.airdropFeesBNB.toFixed(2) : '0.00', 
-      trend: kpis?.trends.fees, 
+      label: '累计空投收益', 
+      value: `${kpis?.airdropFeesBNB.toFixed(4) || '0'} BNB`, 
+      change: kpis?.trends?.fees || 0, 
       icon: Coins, 
-      color: 'emerald' 
+      color: 'blue', 
+      bgClass: 'bg-blue-500/10',
+      iconBgClass: 'bg-blue-500/20',
+      textClass: 'text-blue-400'
     },
     { 
-      label: 'RAT 总持仓量', 
-      value: `${((kpis?.totalRATCirculating || 0) / 1000000).toFixed(2)}M`, 
-      trend: kpis?.trends.rat, 
+      label: 'RAT 流通量', 
+      value: kpis?.totalRATCirculating.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0', 
+      change: kpis?.trends?.rat || 0, 
       icon: Gem, 
-      color: 'indigo' 
+      color: 'purple', 
+      bgClass: 'bg-purple-500/10',
+      iconBgClass: 'bg-purple-500/20',
+      textClass: 'text-purple-400'
     },
   ];
 
   return (
     <>
-      <NotificationContainer 
-        notifications={notifications} 
-        onRemove={removeNotification} 
-      />
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      
       <div className="space-y-8 animate-in fade-in duration-500">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-white">数据概览</h2>
-            <p className="text-zinc-400 text-sm">RAT 持币生息系统核心指标监控，不含质押 TVL 统计。</p>
+            <h1 className="text-3xl font-black text-white tracking-tight">概览</h1>
+            <p className="text-zinc-500 mt-1 text-sm font-medium">系统整体数据和关键指标</p>
           </div>
-          {isRefreshing && (
-            <div className="text-xs text-zinc-500 flex items-center gap-2">
-              <RefreshCw size={14} className="animate-spin" />
-              刷新中...
+          <button
+            onClick={refresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-900/50 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white disabled:text-zinc-600 transition-all font-medium text-sm shadow-lg disabled:cursor-not-allowed group"
+          >
+            <RefreshCw className={`${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-500`} size={16} />
+            <span>{isRefreshing ? '刷新中...' : '刷新数据'}</span>
+          </button>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {cards.map((card, index) => {
+            const Icon = card.icon;
+            const isPositive = (card.change || 0) >= 0;
+            const TrendIcon = isPositive ? TrendingUp : TrendingDown;
+            
+            return (
+              <div key={index} className={`p-6 ${card.bgClass} border border-zinc-800 rounded-2xl hover:scale-[1.02] transition-all shadow-xl backdrop-blur-sm`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-3 ${card.iconBgClass} rounded-xl`}>
+                    <Icon className={card.textClass} size={24} strokeWidth={2} />
+                  </div>
+                  {card.change !== 0 && (
+                    <div className={`flex items-center gap-1 text-xs font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <TrendIcon size={14} />
+                      <span>{Math.abs(card.change || 0).toFixed(1)}%</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-2">{card.label}</p>
+                  <p className={`text-3xl font-black ${card.textClass} tracking-tight`}>{card.value}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* RAT 持币大户排行榜 */}
+        <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center gap-2 mb-6">
+            <PieChart className="text-purple-400" size={20} />
+            <h2 className="text-xl font-black text-white">RAT 持币大户排行</h2>
+            <span className="text-zinc-600 text-xs font-bold">TOP 5</span>
+          </div>
+          
+          {topHolders.length === 0 ? (
+            <EmptyState message="暂无持币大户数据" />
+          ) : (
+            <div className="space-y-3">
+              {topHolders.map((holder) => {
+                const rankColors = ['text-yellow-400', 'text-zinc-300', 'text-amber-600'];
+                const rankColor = rankColors[holder.rank - 1] || 'text-zinc-500';
+                
+                return (
+                  <div key={holder.address} className="flex items-center justify-between p-4 bg-zinc-900/50 hover:bg-zinc-900/70 border border-zinc-800 rounded-xl transition-all group">
+                    <div className="flex items-center gap-4">
+                      <span className={`text-2xl font-black ${rankColor} w-8 text-center`}>#{holder.rank}</span>
+                      <code className="text-sm text-zinc-400 font-mono group-hover:text-white transition-colors">
+                        {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
+                      </code>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-black text-purple-400">{holder.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-xs text-zinc-600 font-bold uppercase">RAT</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card, i) => (
-          <div 
-            key={i} 
-            className={`p-5 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex flex-col justify-between hover:border-zinc-700 transition-colors ${
-              card.color === 'red' ? 'ring-1 ring-red-500/20 bg-red-500/[0.02]' : ''
-            }`}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-2 rounded-lg ${
-                card.color === 'red' ? 'bg-red-500/10 text-red-500' :
-                card.color === 'blue' ? 'bg-blue-500/10 text-blue-400' :
-                card.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
-                card.color === 'indigo' ? 'bg-indigo-500/10 text-indigo-400' :
-                'bg-zinc-800 text-zinc-400'
-              }`}>
-                <card.icon size={20} />
-              </div>
-              {card.trend !== undefined && card.trend !== 0 && (
-                <div className={`flex items-center text-xs font-medium ${card.trend >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {card.trend >= 0 ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
-                  {Math.abs(card.trend)}%
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">{card.label}</p>
-              <h3 className="text-2xl font-bold text-white">{card.value}</h3>
-            </div>
-          </div>
-        ))}
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 p-6 bg-zinc-900/50 border border-zinc-800 rounded-2xl h-80 flex flex-col">
-           <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-semibold text-white">持币生息趋势</h4>
-              <div className="flex items-center gap-4 text-[10px] text-zinc-500 font-bold uppercase">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> RAT 持有</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-indigo-500"></div> USDT 收益</span>
-              </div>
-           </div>
-           <div className="flex-1 flex items-center justify-center text-zinc-500">
-             <div className="text-center">
-               <PieChart size={48} className="mx-auto mb-4 opacity-10" />
-               <p className="text-xs opacity-50 font-mono tracking-widest">REAL-TIME DATA STREAM ACTIVE</p>
-             </div>
-           </div>
-        </div>
-        <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-2xl h-80 overflow-hidden flex flex-col">
-          <h4 className="text-sm font-semibold mb-4 text-white">RAT 持币大户排行</h4>
-          <div className="space-y-4 overflow-y-auto pr-2">
-            {topHolders.length === 0 ? (
-              <EmptyState
-                variant="database"
-                title="暂无持币数据"
-                description="还没有用户持有 RAT 代币"
-              />
-            ) : (
-              topHolders.map((holder) => {
-                const maxBalance = topHolders[0]?.balance || 1;
-                const percentage = (holder.balance / maxBalance) * 100;
-                return (
-                  <div key={holder.address} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-emerald-500">
-                      #{holder.rank}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate text-zinc-300 font-mono">
-                        {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
-                      </p>
-                      <div className="w-full bg-zinc-800 h-1 rounded-full mt-1">
-                        <div className="bg-emerald-500 h-1 rounded-full" style={{width: `${percentage}%`}}></div>
-                      </div>
-                    </div>
-                    <p className="text-[10px] font-mono font-black text-zinc-100">{holder.balance.toFixed(0)} RAT</p>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
     </>
   );
 };
