@@ -94,8 +94,8 @@ export async function getAdminKPIs() {
     ok: boolean;
     usersTotal: number;
     claims24h?: number; // 🟢 新增：24小时领取次数
-    pendingWithdrawTotal: string;
-    pendingWithdrawUnit: string;
+    totalExpenses: number; // 🟢 修改：总累计支出（替换待处理提现）
+    totalExpensesUnit: string;
     airdropFeeRecipient: string;
     airdropFeeBalance: string;
     airdropFeeUnit: string;
@@ -237,6 +237,17 @@ export async function getDailyClaimsStats(days: number = 7) {
       count: number;
     }>;
   }>(`/admin/claims/daily-stats?days=${days}`);
+}
+
+// 🟢 新增：获取每日用户增长统计
+export async function getDailyUserGrowthStats(days: number = 7) {
+  return apiFetch<{
+    ok: boolean;
+    stats: Array<{
+      date: string; // YYYY-MM-DD
+      count: number;
+    }>;
+  }>(`/admin/users/daily-growth?days=${days}`);
 }
 
 // 获取收益统计信息

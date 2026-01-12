@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Users, AlertCircle, Coins, TrendingUp, TrendingDown, RefreshCw, BarChart3 } from 'lucide-react';
-import { getAdminKPIs, getDailyClaimsStats, getAdminUserList } from '../lib/api';
+import { Users, Coins, TrendingUp, TrendingDown, RefreshCw, BarChart3, DollarSign } from 'lucide-react';
+import { getAdminKPIs, getDailyClaimsStats, getDailyUserGrowthStats, getAdminUserList } from '../lib/api';
 import { KPIResponse } from '../types';
 import { useAutoRefresh } from '../hooks';
 import { CardSkeleton, EmptyState, useNotifications, NotificationContainer } from '../components';
@@ -14,7 +14,8 @@ const Dashboard: React.FC = () => {
   const { notifications, showNotification, removeNotification } = useNotifications();
   const [kpis, setKpis] = useState<KPIResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dailyStats, setDailyStats] = useState<Array<{ date: string; count: number }>>([]);
+  const [dailyClaimsStats, setDailyClaimsStats] = useState<Array<{ date: string; count: number }>>([]);
+  const [dailyUserGrowthStats, setDailyUserGrowthStats] = useState<Array<{ date: string; count: number }>>([]);
 
   const fetchKPIs = useCallback(async () => {
     let usersTotal = 0;
@@ -82,13 +83,24 @@ const Dashboard: React.FC = () => {
   }, []);
 
   // 🟢 新增：获取每日领取次数统计
-  const fetchDailyStats = useCallback(async () => {
+  const fetchDailyClaimsStats = useCallback(async () => {
     try {
       const data = await getDailyClaimsStats(7); // 最近7天
-      setDailyStats(data.stats || []);
+      setDailyClaimsStats(data.stats || []);
     } catch (error: any) {
       console.error('获取每日领取统计失败:', error);
-      setDailyStats([]);
+      setDailyClaimsStats([]);
+    }
+  }, []);
+
+  // 🟢 新增：获取每日用户增长统计
+  const fetchDailyUserGrowthStats = useCallback(async () => {
+    try {
+      const data = await getDailyUserGrowthStats(7); // 最近7天
+      setDailyUserGrowthStats(data.stats || []);
+    } catch (error: any) {
+      console.error('获取每日用户增长统计失败:', error);
+      setDailyUserGrowthStats([]);
     }
   }, []);
 
@@ -100,11 +112,19 @@ const Dashboard: React.FC = () => {
     immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
   });
 
-  // 🟢 新增：每日统计独立刷新（每 60 秒刷新一次）
+  // 🟢 新增：每日领取次数统计独立刷新（每 60 秒刷新一次）
   useAutoRefresh({
     enabled: true,
     interval: 60000, // 60 秒刷新一次
-    onRefresh: fetchDailyStats,
+    onRefresh: fetchDailyClaimsStats,
+    immediate: true, // 立即加载一次
+  });
+
+  // 🟢 新增：每日用户增长统计独立刷新（每 60 秒刷新一次）
+  useAutoRefresh({
+    enabled: true,
+    interval: 60000, // 60 秒刷新一次
+    onRefresh: fetchDailyUserGrowthStats,
     immediate: true, // 立即加载一次
   });
 
@@ -143,10 +163,10 @@ const Dashboard: React.FC = () => {
       textClass: 'text-cyan-400'
     },
     { 
-      label: '待处理提现', 
-      value: kpis?.pendingWithdrawals?.toString() || '0', 
-      change: kpis?.trends?.withdrawals || 0, 
-      icon: AlertCircle, 
+      label: '总累计支出', 
+      value: `${kpis?.totalExpenses?.toFixed(2) || '0'} USDT`, 
+      change: 0, 
+      icon: DollarSign, 
       color: 'amber', 
       bgClass: 'bg-amber-500/10',
       iconBgClass: 'bg-amber-500/20',
@@ -224,14 +244,14 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          {dailyStats.length === 0 ? (
+          {dailyClaimsStats.length === 0 ? (
             <EmptyState title="暂无统计数据" />
           ) : (
             <div className="space-y-4">
               {/* 简单的柱状图 */}
               <div className="flex items-end justify-between gap-2 h-48">
-                {dailyStats.map((stat, index) => {
-                  const maxCount = Math.max(...dailyStats.map(s => s.count));
+                {dailyClaimsStats.map((stat, index) => {
+                  const maxCount = Math.max(...dailyClaimsStats.map(s => s.count));
                   const heightPercent = maxCount > 0 ? (stat.count / maxCount) * 100 : 0;
                   const date = new Date(stat.date);
                   const dayLabel = date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
@@ -257,18 +277,80 @@ const Dashboard: React.FC = () => {
               <div className="grid grid-cols-3 gap-4 pt-4 border-t border-zinc-800">
                 <div className="text-center">
                   <p className="text-xs text-zinc-500 font-bold uppercase mb-1">总计</p>
-                  <p className="text-lg font-black text-white">{dailyStats.reduce((sum, s) => sum + s.count, 0).toLocaleString()}</p>
+                  <p className="text-lg font-black text-white">{dailyClaimsStats.reduce((sum, s) => sum + s.count, 0).toLocaleString()}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-zinc-500 font-bold uppercase mb-1">日均</p>
                   <p className="text-lg font-black text-cyan-400">
-                    {Math.round(dailyStats.reduce((sum, s) => sum + s.count, 0) / dailyStats.length).toLocaleString()}
+                    {Math.round(dailyClaimsStats.reduce((sum, s) => sum + s.count, 0) / dailyClaimsStats.length).toLocaleString()}
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-zinc-500 font-bold uppercase mb-1">峰值</p>
                   <p className="text-lg font-black text-emerald-400">
-                    {Math.max(...dailyStats.map(s => s.count)).toLocaleString()}
+                    {Math.max(...dailyClaimsStats.map(s => s.count)).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 🟢 新增：每日用户增长趋势图 */}
+        <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Users className="text-emerald-400" size={20} />
+              <h2 className="text-xl font-black text-white">每日用户增长趋势</h2>
+              <span className="text-zinc-600 text-xs font-bold">最近 7 天</span>
+            </div>
+          </div>
+          
+          {dailyUserGrowthStats.length === 0 ? (
+            <EmptyState title="暂无统计数据" />
+          ) : (
+            <div className="space-y-4">
+              {/* 简单的柱状图 */}
+              <div className="flex items-end justify-between gap-2 h-48">
+                {dailyUserGrowthStats.map((stat, index) => {
+                  const maxCount = Math.max(...dailyUserGrowthStats.map(s => s.count));
+                  const heightPercent = maxCount > 0 ? (stat.count / maxCount) * 100 : 0;
+                  const date = new Date(stat.date);
+                  const dayLabel = date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+                  
+                  return (
+                    <div key={stat.date} className="flex-1 flex flex-col items-center gap-2 group">
+                      <div className="relative w-full">
+                        <div 
+                          className="w-full bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-t-lg transition-all duration-300 group-hover:from-emerald-400 group-hover:to-emerald-300"
+                          style={{ height: `${heightPercent}%`, minHeight: '4px' }}
+                        />
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-xs font-bold text-emerald-400 whitespace-nowrap">{stat.count}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-zinc-500 font-medium">{dayLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* 统计摘要 */}
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-zinc-800">
+                <div className="text-center">
+                  <p className="text-xs text-zinc-500 font-bold uppercase mb-1">总计</p>
+                  <p className="text-lg font-black text-white">{dailyUserGrowthStats.reduce((sum, s) => sum + s.count, 0).toLocaleString()}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-zinc-500 font-bold uppercase mb-1">日均</p>
+                  <p className="text-lg font-black text-emerald-400">
+                    {Math.round(dailyUserGrowthStats.reduce((sum, s) => sum + s.count, 0) / dailyUserGrowthStats.length).toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-zinc-500 font-bold uppercase mb-1">峰值</p>
+                  <p className="text-lg font-black text-cyan-400">
+                    {Math.max(...dailyUserGrowthStats.map(s => s.count)).toLocaleString()}
                   </p>
                 </div>
               </div>
