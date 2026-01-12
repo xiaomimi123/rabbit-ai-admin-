@@ -252,20 +252,22 @@ const Dashboard: React.FC = () => {
               <div className="flex items-end justify-between gap-2 h-48">
                 {dailyClaimsStats.map((stat, index) => {
                   const maxCount = Math.max(...dailyClaimsStats.map(s => s.count));
-                  const heightPercent = maxCount > 0 ? (stat.count / maxCount) * 100 : 0;
+                  const heightPx = maxCount > 0 ? (stat.count / maxCount) * 160 : 4; // 使用像素高度，最大160px
                   const date = new Date(stat.date);
                   const dayLabel = date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
                   
                   return (
                     <div key={stat.date} className="flex-1 flex flex-col items-center gap-2 group">
-                      <div className="relative w-full">
-                        <div 
-                          className="w-full bg-gradient-to-t from-cyan-500 to-cyan-400 rounded-t-lg transition-all duration-300 group-hover:from-cyan-400 group-hover:to-cyan-300"
-                          style={{ height: `${heightPercent}%`, minHeight: '4px' }}
-                        />
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="relative w-full flex flex-col items-center">
+                        {/* 悬停显示的数字 */}
+                        <div className="mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <span className="text-xs font-bold text-cyan-400 whitespace-nowrap">{stat.count}</span>
                         </div>
+                        {/* 柱子 */}
+                        <div 
+                          className="w-full bg-gradient-to-t from-cyan-500 to-cyan-400 rounded-t-lg transition-all duration-300 group-hover:from-cyan-400 group-hover:to-cyan-300"
+                          style={{ height: `${heightPx}px`, minHeight: '4px' }}
+                        />
                       </div>
                       <span className="text-xs text-zinc-500 font-medium">{dayLabel}</span>
                     </div>
@@ -314,20 +316,22 @@ const Dashboard: React.FC = () => {
               <div className="flex items-end justify-between gap-2 h-48">
                 {dailyUserGrowthStats.map((stat, index) => {
                   const maxCount = Math.max(...dailyUserGrowthStats.map(s => s.count));
-                  const heightPercent = maxCount > 0 ? (stat.count / maxCount) * 100 : 0;
+                  const heightPx = maxCount > 0 ? (stat.count / maxCount) * 160 : 4; // 使用像素高度，最大160px
                   const date = new Date(stat.date);
                   const dayLabel = date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
                   
                   return (
                     <div key={stat.date} className="flex-1 flex flex-col items-center gap-2 group">
-                      <div className="relative w-full">
-                        <div 
-                          className="w-full bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-t-lg transition-all duration-300 group-hover:from-emerald-400 group-hover:to-emerald-300"
-                          style={{ height: `${heightPercent}%`, minHeight: '4px' }}
-                        />
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="relative w-full flex flex-col items-center">
+                        {/* 悬停显示的数字 */}
+                        <div className="mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <span className="text-xs font-bold text-emerald-400 whitespace-nowrap">{stat.count}</span>
                         </div>
+                        {/* 柱子 */}
+                        <div 
+                          className="w-full bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-t-lg transition-all duration-300 group-hover:from-emerald-400 group-hover:to-emerald-300"
+                          style={{ height: `${heightPx}px`, minHeight: '4px' }}
+                        />
                       </div>
                       <span className="text-xs text-zinc-500 font-medium">{dayLabel}</span>
                     </div>
