@@ -107,7 +107,7 @@ const WithdrawalExpenses: React.FC = () => {
 
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
-    interval: 30000, // 30秒刷新一次
+    interval: 300000, // 5分钟刷新一次（后台管理不需要实时数据）
     immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
     onRefresh: refreshCallback, // 🟢 修复：使用稳定的回调函数
   });

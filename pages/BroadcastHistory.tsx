@@ -45,7 +45,7 @@ const BroadcastHistoryPage: React.FC = () => {
   // 🟢 优化：使用 useAutoRefresh Hook
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
-    interval: 30000, // 30秒刷新一次
+    interval: 300000, // 5分钟刷新一次（后台管理不需要实时数据）
     onRefresh: fetchHistory,
   });
 

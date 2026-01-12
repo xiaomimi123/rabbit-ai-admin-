@@ -302,7 +302,7 @@ const UsersPage: React.FC = () => {
   // 🟢 优化：使用 useAutoRefresh Hook
   const { refresh, isRefreshing } = useAutoRefresh({
     enabled: true,
-    interval: 30000, // 30秒刷新一次
+    interval: 300000, // 5分钟刷新一次（后台管理不需要实时数据）
     immediate: false, // 🟢 修复：不立即执行，避免与初始加载冲突
     onRefresh: () => fetchUsers(true), // 🟢 修复：传递 isRefresh=true，不显示骨架屏
   });
