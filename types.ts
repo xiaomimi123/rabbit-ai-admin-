@@ -1,6 +1,7 @@
 
 export interface KPIResponse {
   totalUsers: number;
+  claims24h?: number; // 🟢 新增：24小时领取次数
   pendingWithdrawals: number;
   airdropFeesBNB: number;
   totalRATCirculating: number; // 替换 TVL 为 RAT 流通量

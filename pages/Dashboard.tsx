@@ -33,6 +33,7 @@ const Dashboard: React.FC = () => {
       // 暂时移除趋势数据（需要历史数据支持，后续可以实现）
       const mockData: KPIResponse = {
         totalUsers: usersTotal || 0,
+        claims24h: data.claims24h || 0, // 🟢 新增：24小时领取次数
         pendingWithdrawals: Math.ceil(parseFloat(data.pendingWithdrawTotal || '0') / 50), // 估算待处理数量
         airdropFeesBNB: airdropFeesBNB,
         totalRATCirculating: totalRAT,
@@ -67,6 +68,7 @@ const Dashboard: React.FC = () => {
       // 🟢 修复：即使失败也设置默认值，避免页面显示空白
       setKpis({
         totalUsers: usersTotal,
+        claims24h: 0, // 🟢 新增：默认值
         pendingWithdrawals: 0,
         airdropFeesBNB: 0,
         totalRATCirculating: 0,
@@ -132,6 +134,16 @@ const Dashboard: React.FC = () => {
       textClass: 'text-emerald-400'
     },
     { 
+      label: '24小时领取次数', 
+      value: kpis?.claims24h?.toLocaleString() || '0', 
+      change: 0, 
+      icon: TrendingUp, 
+      color: 'cyan', 
+      bgClass: 'bg-cyan-500/10',
+      iconBgClass: 'bg-cyan-500/20',
+      textClass: 'text-cyan-400'
+    },
+    { 
       label: '待处理提现', 
       value: kpis?.pendingWithdrawals?.toString() || '0', 
       change: kpis?.trends?.withdrawals || 0, 
@@ -185,7 +197,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           {cards.map((card, index) => {
             const Icon = card.icon;
             const isPositive = (card.change || 0) >= 0;
@@ -222,7 +234,7 @@ const Dashboard: React.FC = () => {
           </div>
           
           {topHolders.length === 0 ? (
-            <EmptyState message="暂无持币大户数据" />
+            <EmptyState title="暂无持币大户数据" />
           ) : (
             <div className="space-y-3">
               {topHolders.map((holder) => {

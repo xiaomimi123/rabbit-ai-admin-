@@ -93,6 +93,7 @@ export async function getAdminKPIs() {
   return apiFetch<{
     ok: boolean;
     usersTotal: number;
+    claims24h?: number; // 🟢 新增：24小时领取次数
     pendingWithdrawTotal: string;
     pendingWithdrawUnit: string;
     airdropFeeRecipient: string;
