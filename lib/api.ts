@@ -228,6 +228,17 @@ export async function getTopRATHolders(limit: number = 5) {
   }>(`/admin/top-holders?limit=${limit}`);
 }
 
+// 🟢 新增：获取每日领取次数统计
+export async function getDailyClaimsStats(days: number = 7) {
+  return apiFetch<{
+    ok: boolean;
+    stats: Array<{
+      date: string; // YYYY-MM-DD
+      count: number;
+    }>;
+  }>(`/admin/claims/daily-stats?days=${days}`);
+}
+
 // 获取收益统计信息
 export async function getRevenueStats() {
   return apiFetch<{
